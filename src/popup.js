@@ -163,6 +163,16 @@ async function initializePopup() {
             handleDeleteGroup(groupName);
         };
 
+        // Pencil button to rename the group
+        const renameBtn = document.createElement('button');
+        renameBtn.textContent = '✎';
+        renameBtn.className = 'rename-group-btn';
+        renameBtn.title = 'Rename group';
+        renameBtn.onclick = (e) => {
+            e.stopPropagation();
+            handleRenameGroup(groupName);
+        };
+
         const contentArea = document.createElement('div');
         contentArea.className = 'group-content';
         contentArea.style.display = openGroups.has(Object.keys(themeGroups).indexOf(groupName)) ? "block" : "none";
@@ -202,6 +212,7 @@ async function initializePopup() {
         });
 
         headerContainer.appendChild(header);
+        headerContainer.appendChild(renameBtn);
         headerContainer.appendChild(delGroupBtn);
         groupWrapper.appendChild(headerContainer);
         groupWrapper.appendChild(contentArea);
@@ -407,7 +418,32 @@ async function handleDeleteGroup(groupName) {
         initializePopup();
     }
 }
+/**
+ * Renames an existing group by updating all themes that belong to it.
+ *
+ * @async
+ * @param {string} groupName - The current group name to rename.
+ * @returns {Promise<void>} Resolves after updating storage and refreshing the UI.
+ */
+async function handleRenameGroup(groupName) {
+    const newName = prompt('Rename "' + groupName + '" to:', groupName);
+    if (!newName || newName.trim() === '' || newName.trim().toUpperCase() === groupName.toUpperCase()) return;
 
+    // Step 1: Grab the saved list
+    const data = await browser.storage.local.get('userThemes');
+    const savedThemes = data.userThemes || [];
+
+    // Step 2: Update the group name on every theme that belongs to this group
+    savedThemes.forEach(theme => {
+        if (theme.group.toUpperCase() === groupName.toUpperCase()) {
+            theme.group = newName.trim();
+        }
+    });
+
+    // Step 3: Save and refresh the UI
+    await browser.storage.local.set({ userThemes: savedThemes });
+    initializePopup();
+}
 /**
  * Removes a single theme entry from a specific group.
  * This only removes the matching (themeId + groupName) pair.
@@ -470,7 +506,7 @@ async function moveThemeToGroup(themeId, themeName, targetGroupName) {
 /* eslint-disable no-undef */
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-        initializePopup, buildMenuItem, saveTheme, handleDeleteGroup, handleRemoveTheme,
+        initializePopup, buildMenuItem, saveTheme, handleDeleteGroup, handleRemoveTheme, handleRenameGroup,
         getOriginalThemeId: () => originalThemeId,
         getLockedInTheme: () => lockedInTheme,
         setOriginalThemeId: (v) => { originalThemeId = v; },

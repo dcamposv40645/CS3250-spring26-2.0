@@ -169,6 +169,7 @@ button:hover {
 .delete-group-btn {
     background: none;
     border: none;
+    border-left: 1px solid #333;
     color: #ff4d4d; /* keeping it red so its obvious what it does */
     font-size: 18px;
     cursor: pointer;
@@ -278,4 +279,22 @@ button:hover {
     background: #00f3ff22;
     color: #00f3ff;
     border-color: #00f3ff;
+}
+.rename-group-btn {
+    background: none;
+    border: none;
+    color: #aaa;
+    font-size: 15px;
+    cursor: pointer;
+    padding: 0 10px;
+    width: auto;
+    margin-top: 0;
+    transition: color 0.2s;
+    transform: scaleX(-1);
+    display: inline-flex;
+    align-items: center;
+}
+
+.rename-group-btn:hover {
+    color: #00f3ff;
 }
