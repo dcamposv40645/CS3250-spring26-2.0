@@ -25,6 +25,8 @@
  */
 let originalThemeId = null; // Remembers what theme you had before you started hovering
 let lockedInTheme = null;   // Remembers what theme you actually clicked
+// eslint-disable-next-line prefer-const
+let currentSort = 'newest'; // Tracks the active sort order for themes inside groups
 
 /**
  * Initializes the popup by clearing the UI and re-rendering the grouped themes list.
@@ -49,31 +51,47 @@ async function initializePopup() {
     // 1. Get ALL installed themes and your saved Group data
     const allAddons = await browser.management.getAll();
     const storageData = await browser.storage.local.get('userThemes');
-    
+
     const installedThemes = allAddons.filter(addon => addon.type === 'theme');
     const savedThemes = storageData.userThemes || [];
 
-    // 2. Clear the old list before redrawing
+    // 2. Remember which groups were open, then clear the old list before redrawing
+    const openGroups = new Set();
+    currentDiv.querySelectorAll('.group-content').forEach((el, i) => {
+        if (el.style.display !== 'none') {
+            openGroups.add(i);
+        }
+    });
+
     while (currentDiv.firstChild) {
         currentDiv.removeChild(currentDiv.firstChild);
     }
 
-  // 3. Create a Sorting Object (The "Group Map")
-  // { [GROUPNAME_UPPER]: [themeAddOnObj, themeAddOnObj, ...] }
-  /** @type {Record<string, Array<Object>>} */
-  const themeGroups = {};
-  savedThemes.forEach(savedItem => {
-      const groupName = savedItem.group.toUpperCase(); 
-      const match = installedThemes.find(t => t.id === savedItem.id);
-      
-      // Only create the folder array if the theme is actually installed!
-      if (match) {
-          if (!themeGroups[groupName]) {
-              themeGroups[groupName] = [];
-          }
-          themeGroups[groupName].push(match);
-      }
-  });
+    // 3. Create a Sorting Object (The "Group Map")
+    // { [GROUPNAME_UPPER]: [themeAddOnObj, themeAddOnObj, ...] }
+    /** @type {Record<string, Array<Object>>} */
+    const themeGroups = {};
+    savedThemes.forEach(savedItem => {
+        const groupName = savedItem.group.toUpperCase();
+        const match = installedThemes.find(t => t.id === savedItem.id);
+
+        // Only create the folder array if the theme is actually installed!
+        if (match) {
+            if (!themeGroups[groupName]) {
+                themeGroups[groupName] = [];
+            }
+            themeGroups[groupName].push(match);
+        }
+    });
+
+    // Sort themes inside each group before rendering based on the current sort order
+    for (const g in themeGroups) {
+        themeGroups[g].sort((a, b) => {
+            if (currentSort === 'az') return a.name.localeCompare(b.name);
+            if (currentSort === 'oldest') return savedThemes.findIndex(s => s.id === a.id) - savedThemes.findIndex(s => s.id === b.id);
+            return savedThemes.findIndex(s => s.id === b.id) - savedThemes.findIndex(s => s.id === a.id);
+        });
+    }
 
     // 4. Build the Expandable UI (Accordion)
     if (Object.keys(themeGroups).length === 0) {
@@ -83,6 +101,21 @@ async function initializePopup() {
         currentDiv.appendChild(emptyMsg);
     }
 
+    // Build the sort bar so the user can switch between Newest, Oldest, and A-Z
+    const sortBar = document.createElement('div');
+    sortBar.className = 'sort-bar';
+
+    ['Newest', 'Oldest', 'A-Z'].forEach(label => {
+        const key = label === 'A-Z' ? 'az' : label.toLowerCase();
+        const btn = document.createElement('button');
+        btn.textContent = label;
+        btn.className = 'sort-btn' + (currentSort === key ? ' sort-active' : '');
+        btn.onclick = () => { currentSort = key; initializePopup(); };
+        sortBar.appendChild(btn);
+    });
+
+    currentDiv.appendChild(sortBar);
+
     for (const groupName in themeGroups) {
         const groupWrapper = document.createElement('div');
         groupWrapper.className = 'group-container';
@@ -90,7 +123,7 @@ async function initializePopup() {
         // prompted claude to guide me on how to implement a drag and drop feature
         // lets the group folder act as a drop target when dragging themes around
         groupWrapper.addEventListener('dragover', (e) => {
-            e.preventDefault(); 
+            e.preventDefault();
             groupWrapper.classList.add('drag-over');
         });
 
@@ -101,10 +134,10 @@ async function initializePopup() {
         groupWrapper.addEventListener('drop', async (e) => {
             e.preventDefault();
             groupWrapper.classList.remove('drag-over');
-            
+
             const themeId = e.dataTransfer.getData('text/plain');
             const themeName = e.dataTransfer.getData('themeName');
-            
+
             if (themeId) {
                 await moveThemeToGroup(themeId, themeName, groupName);
             }
@@ -132,7 +165,7 @@ async function initializePopup() {
 
         const contentArea = document.createElement('div');
         contentArea.className = 'group-content';
-        contentArea.style.display = "none"; 
+        contentArea.style.display = openGroups.has(Object.keys(themeGroups).indexOf(groupName)) ? "block" : "none";
 
         // Loop that adds drag handle + Theme + Remove "x" Button
         themeGroups[groupName].forEach(theme => {
@@ -161,7 +194,7 @@ async function initializePopup() {
         header.addEventListener('click', () => {
             if (contentArea.style.display === "none") {
                 contentArea.style.display = "block";
-                header.textContent = groupName; 
+                header.textContent = groupName;
             } else {
                 contentArea.style.display = "none";
                 header.textContent = groupName + " (" + themeGroups[groupName].length + ")";
@@ -180,32 +213,39 @@ async function initializePopup() {
     otherHeader.textContent = "Ungrouped Themes";
     currentDiv.appendChild(otherHeader);
 
-    installedThemes.forEach(theme => {
-        const isAlreadySaved = savedThemes.some(s => s.id === theme.id);
-        if (!isAlreadySaved) {
-            const row = document.createElement('div');
-            row.className = 'theme-item-row';
+    const ungroupedThemes = installedThemes.filter(theme => !savedThemes.some(s => s.id === theme.id));
 
-            const handle = document.createElement('span');
-            handle.className = 'drag-handle';
-            handle.textContent = '≡';
+    // Sort ungrouped themes using the same active sort order as the groups
+    ungroupedThemes.sort((a, b) => {
+        if (currentSort === 'az') return a.name.localeCompare(b.name);
+        if (currentSort === 'oldest') return installedThemes.indexOf(a) - installedThemes.indexOf(b);
+        return installedThemes.indexOf(b) - installedThemes.indexOf(a);
+    });
 
-            const themeBtn = buildMenuItem(theme);
-            themeBtn.style.flex = "1";
+    ungroupedThemes.forEach(theme => {
+        const row = document.createElement('div');
+        row.className = 'theme-item-row';
 
-            // For ungrouped, the × saves to a "removed" list or just does nothing visually
-            // Here we just hide the row as a soft remove (they can re-appear on reload)
-            const removeBtn = document.createElement('button');
-            removeBtn.textContent = "×";
-            removeBtn.className = 'remove-item-btn';
-            removeBtn.title = "Hide from ungrouped";
-            removeBtn.onclick = () => { row.remove(); };
+        const handle = document.createElement('span');
+        handle.className = 'drag-handle';
+        handle.textContent = '≡';
 
-            row.appendChild(handle);
-            row.appendChild(themeBtn);
-            row.appendChild(removeBtn);
-            currentDiv.appendChild(row);
-        }
+        const themeBtn = buildMenuItem(theme);
+        themeBtn.style.flex = "1";
+
+        // For ungrouped, the × saves to a "removed" list or just does nothing visually
+        // Here we just hide the row as a soft remove (they can re-appear on reload)
+        const removeBtn = document.createElement('button');
+        removeBtn.textContent = "×";
+        removeBtn.className = 'remove-item-btn';
+        removeBtn.title = "Hide from ungrouped";
+        removeBtn.onclick = () => { row.remove(); };
+
+        row.appendChild(handle);
+        row.appendChild(themeBtn);
+        row.appendChild(removeBtn);
+        currentDiv.appendChild(row);
+
     });
 }
 
@@ -230,7 +270,7 @@ function buildMenuItem(theme) {
     // prompted claude to guide me on how to implement a drag and drop feature
     // drag setup - stores the theme id so the drop target knows what got dragged
     btn.draggable = true;
-    
+
     btn.addEventListener('dragstart', (e) => {
         e.dataTransfer.setData('text/plain', theme.id);
         e.dataTransfer.setData('themeName', theme.name);
@@ -243,27 +283,35 @@ function buildMenuItem(theme) {
 
     // HOVER: Show a quick preview without changing settings permanently
     btn.addEventListener('mouseenter', async () => {
-        const allAddons = await browser.management.getAll();
-        const currentActive = allAddons.find(a => a.type === 'theme' && a.enabled);
-        
-        if (currentActive && currentActive.id !== theme.id) {
-            originalThemeId = currentActive.id; // Remember where we started
+        try {
+            const allAddons = await browser.management.getAll();
+            const currentActive = allAddons.find(a => a.type === 'theme' && a.enabled);
+
+            if (currentActive && currentActive.id !== theme.id) {
+                originalThemeId = currentActive.id; // Remember where we started
+            }
+            await browser.management.setEnabled(theme.id, true);
+        } catch (_err) {
+            // theme cannot be previewed, skip it
         }
-        await browser.management.setEnabled(theme.id, true);
     });
 
     // LEAVE: Put back the original theme unless the user clicked
     btn.addEventListener('mouseleave', async () => {
-        if (originalThemeId) {
-            await browser.management.setEnabled(originalThemeId, true);
+        try {
+            if (originalThemeId) {
+                await browser.management.setEnabled(originalThemeId, true);
+            }
+        } catch (_err) {
+            // restore failed, skip it
         }
     });
 
     // CLICK: Lock it in permanently
     btn.addEventListener('click', async () => {
         originalThemeId = null; // Clear the memory so 'mouseleave' doesn't undo the click
-        lockedInTheme = theme;   
-        
+        lockedInTheme = theme;
+
         await browser.management.setEnabled(theme.id, true);
 
         // Autofill the name box for easy saving
@@ -308,7 +356,7 @@ async function saveTheme() {
 
     savedList.push(newEntry);
     await browser.storage.local.set({ userThemes: savedList }); //
-    
+
     statusMsg.textContent = "Saved to " + groupName + "!";
     initializePopup(); // Refresh the list immediately
 }
@@ -340,23 +388,23 @@ if (shutdown) {
 async function handleDeleteGroup(groupName) {
     // A simple pop-up to make sure you don't delete your hard work by accident
     const check = confirm("Delete the " + groupName + " group?");
-    
+
     if (check) {
         // Step 1: Get the current list from Firefox storage
         const data = await browser.storage.local.get('userThemes');
         const savedThemes = data.userThemes || [];
-        
+
         // Step 2: Sift through the list and keep only the themes in OTHER groups
         // This effectively "deletes" the group you clicked
-        const updatedList = savedThemes.filter(function(theme) {
+        const updatedList = savedThemes.filter(function (theme) {
             return theme.group.toUpperCase() !== groupName.toUpperCase();
         });
-        
+
         // Step 3: Save the new, smaller list back to storage
         await browser.storage.local.set({ userThemes: updatedList });
-        
+
         // Step 4: Redraw the popup so the group disappears instantly
-        initializePopup(); 
+        initializePopup();
     }
 }
 
@@ -373,17 +421,17 @@ async function handleRemoveTheme(themeId, groupName) {
     // Step 1: Grab the saved list
     const data = await browser.storage.local.get('userThemes');
     const savedThemes = data.userThemes || [];
-    
+
     // Step 2: Use .filter to remove ONLY the match for this ID and this Group
     // It says: "Keep the theme if it's a different ID OR in a different group"
-    const updatedList = savedThemes.filter(function(theme) {
+    const updatedList = savedThemes.filter(function (theme) {
         const sameId = (theme.id === themeId);
         const sameGroup = (theme.group.toUpperCase() === groupName.toUpperCase());
-        
+
         // Only return true if it's NOT the exact one we want to remove
         return !(sameId && sameGroup);
     });
-    
+
     // Step 3: Save and refresh the UI
     await browser.storage.local.set({ userThemes: updatedList });
     initializePopup();
@@ -402,9 +450,9 @@ async function handleRemoveTheme(themeId, groupName) {
 async function moveThemeToGroup(themeId, themeName, targetGroupName) {
     const data = await browser.storage.local.get('userThemes');
     const savedThemes = data.userThemes || [];
-    
+
     const existingIndex = savedThemes.findIndex(t => t.id === themeId);
-    
+
     if (existingIndex !== -1) {
         savedThemes[existingIndex].group = targetGroupName;
     } else {
@@ -414,7 +462,7 @@ async function moveThemeToGroup(themeId, themeName, targetGroupName) {
             group: targetGroupName
         });
     }
-    
+
     await browser.storage.local.set({ userThemes: savedThemes });
     initializePopup();
 }

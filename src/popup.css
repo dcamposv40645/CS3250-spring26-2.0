@@ -248,3 +248,34 @@ button:hover {
 .remove-item-btn:hover {
     color: #ff0000;
 }
+.sort-bar {
+    display: flex;
+    gap: 6px;
+    margin: 10px 0;
+}
+
+.sort-btn {
+    flex: 1;
+    padding: 6px 0;
+    font-size: 11px;
+    background: #1a1a1a;
+    color: #888;
+    border: 1px solid #333;
+    border-radius: 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 0;
+    transition: all 0.2s;
+}
+
+.sort-btn:hover {
+    color: #00f3ff;
+    border-color: #00f3ff;
+}
+
+.sort-btn.sort-active {
+    background: #00f3ff22;
+    color: #00f3ff;
+    border-color: #00f3ff;
+}
