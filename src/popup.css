@@ -227,7 +227,10 @@ button:hover {
     text-overflow: ellipsis; /* cuts off really long names with ... instead of breaking layout */
     margin-top: 0;
 }
-
+.theme-item-row .theme-button:hover {
+    background: none;
+    box-shadow: none;
+}
 /* the x on each theme row. Made it red straight away */
 .remove-item-btn {
     flex-shrink: 0; /* same idea as the other buttons, dont let it get squished */
@@ -301,8 +304,9 @@ button:hover {
 /* Drag tooltip that appears on theme row hover */
 .drag-tooltip {
     position: absolute;
-    bottom: -22px;
-    left: 40px;
+    top: calc(100% + 4px);
+    left: 50%;
+    transform: translateX(-50%);
     background: #1a1a1a;
     color: #555;
     font-size: 10px;
@@ -329,4 +333,9 @@ button:hover {
 }
 .drag-handle:hover svg {
     stroke: #00f3ff !important;
+}
+/* Highlights the whole row in green when you hover over a theme */
+.theme-item-row:hover {
+    box-shadow: 0 0 8px #00ff9d, inset 0 0 8px #00ff9d22;
+    z-index: 2;
 }
