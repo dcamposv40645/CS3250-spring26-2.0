@@ -182,10 +182,38 @@ async function initializePopup() {
             const row = document.createElement('div');
             row.className = 'theme-item-row';
 
-            const handle = document.createElement('span');
-            handle.className = 'drag-handle';
-            handle.textContent = '≡';
+            const eyeBtn = document.createElement('span');
+            eyeBtn.className = 'drag-handle';
+            eyeBtn.title = 'Preview theme';
+            eyeBtn.innerHTML = `
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+        <circle cx="12" cy="12" r="3"></circle>
+    </svg>
+`;
+            // HOVER: Preview is now handled by the eye icon on the left of each row
+            eyeBtn.addEventListener('mouseenter', async () => {
+                try {
+                    const allAddons = await browser.management.getAll();
+                    const currentActive = allAddons.find(a => a.type === 'theme' && a.enabled);
+                    if (currentActive && currentActive.id !== theme.id) {
+                        originalThemeId = currentActive.id;
+                    }
+                    await browser.management.setEnabled(theme.id, true);
+                } catch (_err) {
+                    // theme cannot be previewed, skip it
+                }
+            });
 
+            eyeBtn.addEventListener('mouseleave', async () => {
+                try {
+                    if (originalThemeId) {
+                        await browser.management.setEnabled(originalThemeId, true);
+                    }
+                } catch (_err) {
+                    // restore failed, skip it
+                }
+            });
             const themeBtn = buildMenuItem(theme);
             themeBtn.style.flex = "1";
 
@@ -194,9 +222,13 @@ async function initializePopup() {
             removeBtn.className = 'remove-item-btn';
             removeBtn.onclick = () => handleRemoveTheme(theme.id, groupName);
 
-            row.appendChild(handle);
+            row.appendChild(eyeBtn);
             row.appendChild(themeBtn);
             row.appendChild(removeBtn);
+            const tooltip = document.createElement('span');
+            tooltip.className = 'drag-tooltip';
+            tooltip.textContent = 'drag to move between groups';
+            row.appendChild(tooltip);
             contentArea.appendChild(row);
         });
 
@@ -237,10 +269,38 @@ async function initializePopup() {
         const row = document.createElement('div');
         row.className = 'theme-item-row';
 
-        const handle = document.createElement('span');
-        handle.className = 'drag-handle';
-        handle.textContent = '≡';
+        const eyeBtn = document.createElement('span');
+        eyeBtn.className = 'drag-handle';
+        eyeBtn.title = 'Preview theme';
+        eyeBtn.innerHTML = `
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#888" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;">
+        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+        <circle cx="12" cy="12" r="3"></circle>
+    </svg>
+`;
+        // HOVER: Preview is now handled by the eye icon on the left of each row
+        eyeBtn.addEventListener('mouseenter', async () => {
+            try {
+                const allAddons = await browser.management.getAll();
+                const currentActive = allAddons.find(a => a.type === 'theme' && a.enabled);
+                if (currentActive && currentActive.id !== theme.id) {
+                    originalThemeId = currentActive.id;
+                }
+                await browser.management.setEnabled(theme.id, true);
+            } catch (_err) {
+                // theme cannot be previewed, skip it
+            }
+        });
 
+        eyeBtn.addEventListener('mouseleave', async () => {
+            try {
+                if (originalThemeId) {
+                    await browser.management.setEnabled(originalThemeId, true);
+                }
+            } catch (_err) {
+                // restore failed, skip it
+            }
+        });
         const themeBtn = buildMenuItem(theme);
         themeBtn.style.flex = "1";
 
@@ -252,9 +312,13 @@ async function initializePopup() {
         removeBtn.title = "Hide from ungrouped";
         removeBtn.onclick = () => { row.remove(); };
 
-        row.appendChild(handle);
+        row.appendChild(eyeBtn);
         row.appendChild(themeBtn);
         row.appendChild(removeBtn);
+        const tooltip = document.createElement('span');
+        tooltip.className = 'drag-tooltip';
+        tooltip.textContent = 'drag to move between groups';
+        row.appendChild(tooltip);
         currentDiv.appendChild(row);
 
     });
@@ -292,31 +356,8 @@ function buildMenuItem(theme) {
         btn.classList.remove('dragging');
     });
 
-    // HOVER: Show a quick preview without changing settings permanently
-    btn.addEventListener('mouseenter', async () => {
-        try {
-            const allAddons = await browser.management.getAll();
-            const currentActive = allAddons.find(a => a.type === 'theme' && a.enabled);
+    // HOVER: Preview is now handled by the eye icon on the left of each row
 
-            if (currentActive && currentActive.id !== theme.id) {
-                originalThemeId = currentActive.id; // Remember where we started
-            }
-            await browser.management.setEnabled(theme.id, true);
-        } catch (_err) {
-            // theme cannot be previewed, skip it
-        }
-    });
-
-    // LEAVE: Put back the original theme unless the user clicked
-    btn.addEventListener('mouseleave', async () => {
-        try {
-            if (originalThemeId) {
-                await browser.management.setEnabled(originalThemeId, true);
-            }
-        } catch (_err) {
-            // restore failed, skip it
-        }
-    });
 
     // CLICK: Lock it in permanently
     btn.addEventListener('click', async () => {
