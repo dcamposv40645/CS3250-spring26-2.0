@@ -26,7 +26,7 @@
 let originalThemeId = null; // Remembers what theme you had before you started hovering
 let lockedInTheme = null;   // Remembers what theme you actually clicked
 // eslint-disable-next-line prefer-const
-let currentSort = 'newest'; // Tracks the active sort order for themes inside groups
+let currentSort = 'recent'; // Tracks the active sort order for themes inside groups
 
 /**
  * Initializes the popup by clearing the UI and re-rendering the grouped themes list.
@@ -101,11 +101,11 @@ async function initializePopup() {
         currentDiv.appendChild(emptyMsg);
     }
 
-    // Build the sort bar so the user can switch between Newest, Oldest, and A-Z
+    // Build the sort bar so the user can switch between Recent, Oldest, and A-Z
     const sortBar = document.createElement('div');
     sortBar.className = 'sort-bar';
 
-    ['Newest', 'Oldest', 'A-Z'].forEach(label => {
+    ['Recent', 'Oldest', 'A-Z'].forEach(label => {
         const key = label === 'A-Z' ? 'az' : label.toLowerCase();
         const btn = document.createElement('button');
         btn.textContent = label;
