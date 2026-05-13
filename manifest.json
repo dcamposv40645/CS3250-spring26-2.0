@@ -1,5 +1,5 @@
 {
-    "manifest_version": 2,
+    "manifest_version": 3,
     "name": "Anonymous Theme Switcher",
     "version": "1.0.0",
     "description": "Organize and switch Firefox themes by group.",
@@ -8,23 +8,21 @@
         "name": "Ramin, Daniel, Julian, Alejandro, Moe"
     },
     "icons": {
-        "16": "icons/icon.svg",
-        "32": "icons/icon.svg",
-        "48": "icons/icon.svg",
-        "96": "icons/icon.svg",
-        "128": "icons/icon.svg"
+        "16": "icons/icon-16.png",
+        "32": "icons/icon-32.png",
+        "48": "icons/icon-48.png",
+        "96": "icons/icon-96.png"
     },
-    "browser_action": {
+    "action": {
         "default_icon": {
-            "16": "icons/icon.svg",
-            "32": "icons/icon.svg"
+            "16": "icons/icon-16.png",
+            "32": "icons/icon-32.png"
         },
         "default_popup": "src/popup.html",
         "default_title": "Anonymous Theme Switcher"
     },
     "background": {
-        "scripts": ["src/background.js"],
-        "persistent": true
+        "scripts": ["src/background.js"]
     },
     "permissions": [
         "storage",
@@ -36,7 +34,7 @@
     "browser_specific_settings": {
         "gecko": {
             "id": "anonymous_theme_switcher@team-anonymous.org",
-            "strict_min_version": "60.0"
+            "strict_min_version": "109.0"
         }
     }
 }

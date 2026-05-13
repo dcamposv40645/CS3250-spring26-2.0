@@ -112,45 +112,47 @@ browser.alarms.onAlarm.addListener(async (alarm) => {
  * @param {Object} sender - Info about the sender (tab, extension, etc).
  * @returns {Promise<Object|undefined>} Resolves with a response object or undefined.
  */
-browser.runtime.onMessage.addListener(async (msg, _sender) => {
-	if (!msg || !msg.type) return;
-	if (msg.type === 'getState') {
-		const store = await getStorage([STORAGE_KEYS.GROUPS, STORAGE_KEYS.ACTIVE_GROUP, STORAGE_KEYS.CURRENT_INDEX]);
-		return store;
-	}
-
-	if (msg.type === 'setActiveGroup') {
-		const { groupId } = msg;
-		await setStorage({ [STORAGE_KEYS.ACTIVE_GROUP]: groupId });
-		// reset index for new group
-		const map = (await getStorage([STORAGE_KEYS.CURRENT_INDEX]))[STORAGE_KEYS.CURRENT_INDEX] || {};
-		map[groupId] = map[groupId] || 0;
-		await setStorage({ [STORAGE_KEYS.CURRENT_INDEX]: map });
-		// set an alarm according to group's interval
-		const groups = (await getStorage([STORAGE_KEYS.GROUPS]))[STORAGE_KEYS.GROUPS] || [];
-		const group = groups.find(g => g.id === groupId);
-		if (group && group.intervalMs && group.intervalMs >= 60000) {
-			// use minutes for alarms API
-			const minutes = Math.max(1, Math.floor(group.intervalMs / 60000));
-			browser.alarms.create('cycle', { periodInMinutes: minutes });
+browser.runtime.onMessage.addListener((msg, _sender) => {
+	return (async () => {
+		if (!msg || !msg.type) return;
+		if (msg.type === 'getState') {
+			const store = await getStorage([STORAGE_KEYS.GROUPS, STORAGE_KEYS.ACTIVE_GROUP, STORAGE_KEYS.CURRENT_INDEX]);
+			return store;
 		}
-		return { ok: true };
-	}
 
-	if (msg.type === 'next') {
-		const store = await getStorage([STORAGE_KEYS.GROUPS, STORAGE_KEYS.ACTIVE_GROUP, STORAGE_KEYS.CURRENT_INDEX]);
-		const groups = store[STORAGE_KEYS.GROUPS] || [];
-		const activeId = store[STORAGE_KEYS.ACTIVE_GROUP];
-		const idxMap = store[STORAGE_KEYS.CURRENT_INDEX] || {};
-		const group = groups.find(g => g.id === activeId);
-		if (!group || !group.images || group.images.length === 0) return { ok: false };
-		const cur = idxMap[activeId] || 0;
-		const next = nextIndex(cur, group.images.length);
-		idxMap[activeId] = next;
-		await setStorage({ [STORAGE_KEYS.CURRENT_INDEX]: idxMap });
-		await broadcastSetBackground(group.images[next]);
-		return { ok: true };
-	}
+		if (msg.type === 'setActiveGroup') {
+			const { groupId } = msg;
+			await setStorage({ [STORAGE_KEYS.ACTIVE_GROUP]: groupId });
+			// reset index for new group
+			const map = (await getStorage([STORAGE_KEYS.CURRENT_INDEX]))[STORAGE_KEYS.CURRENT_INDEX] || {};
+			map[groupId] = map[groupId] || 0;
+			await setStorage({ [STORAGE_KEYS.CURRENT_INDEX]: map });
+			// set an alarm according to group's interval
+			const groups = (await getStorage([STORAGE_KEYS.GROUPS]))[STORAGE_KEYS.GROUPS] || [];
+			const group = groups.find(g => g.id === groupId);
+			if (group && group.intervalMs && group.intervalMs >= 60000) {
+				// use minutes for alarms API
+				const minutes = Math.max(1, Math.floor(group.intervalMs / 60000));
+				browser.alarms.create('cycle', { periodInMinutes: minutes });
+			}
+			return { ok: true };
+		}
+
+		if (msg.type === 'next') {
+			const store = await getStorage([STORAGE_KEYS.GROUPS, STORAGE_KEYS.ACTIVE_GROUP, STORAGE_KEYS.CURRENT_INDEX]);
+			const groups = store[STORAGE_KEYS.GROUPS] || [];
+			const activeId = store[STORAGE_KEYS.ACTIVE_GROUP];
+			const idxMap = store[STORAGE_KEYS.CURRENT_INDEX] || {};
+			const group = groups.find(g => g.id === activeId);
+			if (!group || !group.images || group.images.length === 0) return { ok: false };
+			const cur = idxMap[activeId] || 0;
+			const next = nextIndex(cur, group.images.length);
+			idxMap[activeId] = next;
+			await setStorage({ [STORAGE_KEYS.CURRENT_INDEX]: idxMap });
+			await broadcastSetBackground(group.images[next]);
+			return { ok: true };
+		}
+	})();
 });
 
 /**
