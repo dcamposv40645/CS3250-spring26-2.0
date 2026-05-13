@@ -410,6 +410,10 @@ async function saveTheme() {
     await browser.storage.local.set({ userThemes: savedList }); //
 
     statusMsg.textContent = "Saved to " + groupName + "!";
+    const panel = document.getElementById('add-group-panel');
+    const toggle = document.getElementById('add-group-toggle');
+    if (panel) panel.style.display = 'none';
+    if (toggle) toggle.classList.remove('active');
     initializePopup(); // Refresh the list immediately
 }
 
@@ -427,6 +431,16 @@ if (saveBtn) {
 const shutdown = document.getElementById('shutdown');
 if (shutdown) {
     shutdown.addEventListener('click', () => window.close());
+}
+
+const addGroupToggle = document.getElementById('add-group-toggle');
+const addGroupPanel = document.getElementById('add-group-panel');
+if (addGroupToggle && addGroupPanel) {
+    addGroupToggle.addEventListener('click', () => {
+        const isOpen = addGroupPanel.style.display === 'block';
+        addGroupPanel.style.display = isOpen ? 'none' : 'block';
+        addGroupToggle.classList.toggle('active', !isOpen);
+    });
 }
 
 /**
