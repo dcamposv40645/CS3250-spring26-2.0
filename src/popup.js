@@ -304,7 +304,7 @@ async function initializePopup() {
         const themeBtn = buildMenuItem(theme);
         themeBtn.style.flex = "1";
 
-        const addToGroupBtn = document.createElement('button');
+        const addToGroupBtn = document.createElement('span');
         addToGroupBtn.textContent = '+';
         addToGroupBtn.className = 'add-to-group-btn';
         addToGroupBtn.title = 'Add to group';
@@ -368,7 +368,8 @@ function buildMenuItem(theme) {
         await browser.management.setEnabled(theme.id, true);
 
         // Autofill the name box for easy saving
-        document.getElementById('theme-name').value = theme.name;
+        const themeNameInput = document.getElementById('theme-name');
+        if (themeNameInput) themeNameInput.value = theme.name;
     });
 
     return btn;
