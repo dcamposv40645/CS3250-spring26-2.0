@@ -398,6 +398,18 @@ button:hover {
 .drag-handle:hover svg {
     stroke: #00f3ff !important;
 }
+.active-theme {
+    color: #00ff9d !important;
+}
+
+.active-theme::before {
+    content: '●';
+    font-size: 7px;
+    color: #00ff9d;
+    margin-right: 7px;
+    vertical-align: middle;
+}
+
 /* Highlights the whole row in green when you hover over a theme */
 .theme-item-row:hover {
     box-shadow: 0 0 8px #00ff9d, inset 0 0 8px #00ff9d22;

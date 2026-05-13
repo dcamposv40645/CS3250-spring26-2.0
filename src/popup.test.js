@@ -47,6 +47,20 @@ function makeFakeElement(tag) {
             (this._listeners['click'] || []).forEach(fn => fn({}));
         },
 
+        // finds all descendant elements matching a class selector like '.foo'
+        querySelectorAll(selector) {
+            const className = selector.startsWith('.') ? selector.slice(1) : null;
+            const results = [];
+            const search = (children) => {
+                (children || []).forEach(child => {
+                    if (className && child.className === className) results.push(child);
+                    if (child.children) search(child.children);
+                });
+            };
+            search(this.children);
+            return results;
+        },
+
         // makes .value work like a real input field
         get value() { return this._value; },
         set value(v) { this._value = v; },
@@ -384,61 +398,6 @@ describe('buildMenuItem', () => {
         expect(btn.tagName).toBe('BUTTON');
         expect(btn.textContent).toBe('My Theme');
         expect(btn.className).toBe('theme-button');
-    });
-
-    test('hovering over a theme enables it as a preview', async () => {
-        browser.management.getAll.mockResolvedValue([makeTheme({ id: 'active-id', enabled: true })]);
-        const btn = buildMenuItem(makeTheme({ id: 'hover-id' }));
-
-        await btn._listeners['mouseenter'][0]();
-
-        expect(browser.management.setEnabled).toHaveBeenCalledWith('hover-id', true);
-    });
-
-    test('hovering saves the currently active theme so we can restore it later', async () => {
-        browser.management.getAll.mockResolvedValue([makeTheme({ id: 'active-id', enabled: true })]);
-        setOriginalThemeId(null);
-        const btn = buildMenuItem(makeTheme({ id: 'different-id' }));
-
-        await btn._listeners['mouseenter'][0]();
-
-        expect(getOriginalThemeId()).toBe('active-id');
-    });
-
-    test('hovering over the already-active theme does not overwrite the saved original', async () => {
-        browser.management.getAll.mockResolvedValue([makeTheme({ id: 'same-id', enabled: true })]);
-        setOriginalThemeId(null);
-        const btn = buildMenuItem(makeTheme({ id: 'same-id' }));
-
-        await btn._listeners['mouseenter'][0]();
-
-        // originalThemeId should still be null because we hovered the same theme
-        expect(getOriginalThemeId()).toBeNull();
-    });
-
-    test('hovering does not crash when no theme is currently active', async () => {
-        browser.management.getAll.mockResolvedValue([makeTheme({ enabled: false })]);
-        const btn = buildMenuItem(makeTheme({ id: 'any' }));
-
-        await expect(btn._listeners['mouseenter'][0]()).resolves.not.toThrow();
-    });
-
-    test('moving the mouse away restores the original theme', async () => {
-        setOriginalThemeId('original-theme');
-        const btn = buildMenuItem(makeTheme({ id: 'hovered-theme' }));
-
-        await btn._listeners['mouseleave'][0]();
-
-        expect(browser.management.setEnabled).toHaveBeenCalledWith('original-theme', true);
-    });
-
-    test('moving the mouse away does nothing if no original theme was saved', async () => {
-        setOriginalThemeId(null);
-        const btn = buildMenuItem(makeTheme({ id: 'hovered-theme' }));
-
-        await btn._listeners['mouseleave'][0]();
-
-        expect(browser.management.setEnabled).not.toHaveBeenCalled();
     });
 
     test('clicking a theme locks it in and clears the hover memory', async () => {

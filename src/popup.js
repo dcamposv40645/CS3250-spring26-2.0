@@ -53,6 +53,7 @@ async function initializePopup() {
     const storageData = await browser.storage.local.get('userThemes');
 
     const installedThemes = allAddons.filter(addon => addon.type === 'theme');
+    const activeTheme = installedThemes.find(t => t.enabled);
     const savedThemes = storageData.userThemes || [];
 
     // 2. Remember which groups were open, then clear the old list before redrawing
@@ -214,7 +215,7 @@ async function initializePopup() {
                     // restore failed, skip it
                 }
             });
-            const themeBtn = buildMenuItem(theme);
+            const themeBtn = buildMenuItem(theme, activeTheme && activeTheme.id === theme.id);
             themeBtn.style.flex = "1";
 
             const removeBtn = document.createElement('button');
@@ -301,7 +302,7 @@ async function initializePopup() {
                 // restore failed, skip it
             }
         });
-        const themeBtn = buildMenuItem(theme);
+        const themeBtn = buildMenuItem(theme, activeTheme && activeTheme.id === theme.id);
         themeBtn.style.flex = "1";
 
         const addToGroupBtn = document.createElement('span');
@@ -338,10 +339,10 @@ async function initializePopup() {
  * @param {string} theme.name - The display name of the theme.
  * @returns {HTMLButtonElement} The button element representing the theme.
  */
-function buildMenuItem(theme) {
+function buildMenuItem(theme, isActive = false) {
     const btn = document.createElement('button');
     btn.textContent = theme.name;
-    btn.className = 'theme-button';
+    btn.className = 'theme-button' + (isActive ? ' active-theme' : '');
 
     // prompted claude to guide me on how to implement a drag and drop feature
     // drag setup - stores the theme id so the drop target knows what got dragged
@@ -370,6 +371,8 @@ function buildMenuItem(theme) {
         // Autofill the name box for easy saving
         const themeNameInput = document.getElementById('theme-name');
         if (themeNameInput) themeNameInput.value = theme.name;
+
+        initializePopup();
     });
 
     return btn;
