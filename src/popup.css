@@ -212,23 +212,37 @@ button:hover {
 
 /* The Delete Button: Now small and stays on the far right */
 .delete-group-btn {
-    background: none;
+    background-color: transparent;
     border: none;
-    border-left: 1px solid #333;
-    color: #ff4d4d; /* keeping it red so its obvious what it does */
+    color: #ff4d4d;
     font-size: 18px;
     cursor: pointer;
-    padding: 0 15px;
+    padding: 0 12px;
     width: auto;
     display: flex;
     align-items: center;
-    justify-content: center; /* stops the x from floating weird */
-    transition: color 0.2s;
-    margin-top: 0; /* overrides the global button margin */
+    justify-content: center;
+    transition: color 0.2s, text-shadow 0.2s;
+    margin-top: 0;
+    border-radius: 0;
+    position: relative;
+}
+
+.delete-group-btn::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 20%;
+    height: 60%;
+    width: 1px;
+    background: #444;
 }
 
 .delete-group-btn:hover {
     color: #ff0000;
+    background: none;
+    box-shadow: none;
+    text-shadow: 0 0 8px #ff4d4d;
 }
 
 /* The container for the theme and the delete 'x' */
@@ -329,22 +343,27 @@ button:hover {
     border-color: #00f3ff;
 }
 .rename-group-btn {
-    background: none;
+    background-color: transparent;
     border: none;
     color: #aaa;
     font-size: 15px;
     cursor: pointer;
-    padding: 0 10px;
+    padding: 0 12px;
     width: auto;
     margin-top: 0;
-    transition: color 0.2s;
+    border-radius: 0;
+    transition: color 0.2s, text-shadow 0.2s;
     transform: scaleX(-1);
     display: inline-flex;
     align-items: center;
+    align-self: stretch;
 }
 
 .rename-group-btn:hover {
     color: #00f3ff;
+    background: none;
+    box-shadow: none;
+    text-shadow: 0 0 8px #00f3ff;
 }
 /* Drag tooltip that appears on theme row hover */
 .drag-tooltip {
@@ -383,4 +402,73 @@ button:hover {
 .theme-item-row:hover {
     box-shadow: 0 0 8px #00ff9d, inset 0 0 8px #00ff9d22;
     z-index: 2;
+}
+
+.add-to-group-btn {
+    flex-shrink: 0;
+    width: auto;
+    padding: 0 12px;
+    margin: 0;
+    margin-top: 0;
+    background: none;
+    border: none;
+    color: #00ff9d;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    transition: text-shadow 0.2s;
+    align-self: center;
+}
+
+.add-to-group-btn:hover {
+    background: none;
+    box-shadow: none;
+    text-shadow: 0 0 8px #00ff9d;
+}
+
+.group-dropdown {
+    position: absolute;
+    right: 0;
+    top: 100%;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 4px;
+    z-index: 200;
+    min-width: 150px;
+    overflow: hidden;
+}
+
+.group-dropdown-item {
+    padding: 8px 14px;
+    font-size: 12px;
+    color: #ccc;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: background 0.15s, color 0.15s;
+}
+
+.group-dropdown-item:hover {
+    background: #2a2a2a;
+    color: #00f3ff;
+}
+
+.group-dropdown-new {
+    color: #00ff9d;
+    border-top: 1px solid #333;
+}
+
+.group-dropdown-new:hover {
+    color: #00ff9d;
+    text-shadow: 0 0 6px #00ff9d;
+}
+
+.group-dropdown-disabled {
+    color: #555;
+    cursor: default;
+}
+
+.group-dropdown-disabled:hover {
+    background: none;
+    color: #555;
 }

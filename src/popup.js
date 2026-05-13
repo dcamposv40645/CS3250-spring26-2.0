@@ -304,17 +304,18 @@ async function initializePopup() {
         const themeBtn = buildMenuItem(theme);
         themeBtn.style.flex = "1";
 
-        // For ungrouped, the × saves to a "removed" list or just does nothing visually
-        // Here we just hide the row as a soft remove (they can re-appear on reload)
-        const removeBtn = document.createElement('button');
-        removeBtn.textContent = "×";
-        removeBtn.className = 'remove-item-btn';
-        removeBtn.title = "Hide from ungrouped";
-        removeBtn.onclick = () => { row.remove(); };
+        const addToGroupBtn = document.createElement('button');
+        addToGroupBtn.textContent = '+';
+        addToGroupBtn.className = 'add-to-group-btn';
+        addToGroupBtn.title = 'Add to group';
+        addToGroupBtn.onclick = (e) => {
+            e.stopPropagation();
+            showGroupDropdown(theme, addToGroupBtn, Object.keys(themeGroups));
+        };
 
         row.appendChild(eyeBtn);
         row.appendChild(themeBtn);
-        row.appendChild(removeBtn);
+        row.appendChild(addToGroupBtn);
         const tooltip = document.createElement('span');
         tooltip.className = 'drag-tooltip';
         tooltip.textContent = 'drag to move between groups';
@@ -537,6 +538,61 @@ async function handleRemoveTheme(themeId, groupName) {
  * @param {string} targetGroupName - The group name to move the theme into.
  * @returns {Promise<void>} Resolves after updating storage and refreshing the UI.
  */
+/**
+ * Shows a dropdown on an ungrouped theme row listing existing groups to add to.
+ *
+ * @param {Object} theme - The theme object being added.
+ * @param {HTMLElement} anchor - The button that was clicked (used for positioning).
+ * @param {string[]} groupNames - List of existing group names.
+ */
+function showGroupDropdown(theme, anchor, groupNames) {
+    document.querySelectorAll('.group-dropdown').forEach(d => d.remove());
+
+    const dropdown = document.createElement('div');
+    dropdown.className = 'group-dropdown';
+
+    if (groupNames.length === 0) {
+        const none = document.createElement('div');
+        none.className = 'group-dropdown-item group-dropdown-disabled';
+        none.textContent = 'No groups yet';
+        dropdown.appendChild(none);
+    }
+
+    groupNames.forEach(name => {
+        const item = document.createElement('div');
+        item.className = 'group-dropdown-item';
+        item.textContent = name;
+        item.onclick = async () => {
+            await moveThemeToGroup(theme.id, theme.name, name);
+            dropdown.remove();
+        };
+        dropdown.appendChild(item);
+    });
+
+    const newGroupItem = document.createElement('div');
+    newGroupItem.className = 'group-dropdown-item group-dropdown-new';
+    newGroupItem.textContent = '+ New group...';
+    newGroupItem.onclick = async () => {
+        dropdown.remove();
+        const newName = prompt('Group name:');
+        if (newName && newName.trim()) {
+            await moveThemeToGroup(theme.id, theme.name, newName.trim());
+        }
+    };
+    dropdown.appendChild(newGroupItem);
+
+    anchor.parentElement.appendChild(dropdown);
+
+    setTimeout(() => {
+        document.addEventListener('click', function handler(e) {
+            if (!dropdown.contains(e.target)) {
+                dropdown.remove();
+                document.removeEventListener('click', handler);
+            }
+        });
+    }, 0);
+}
+
 // move theme drop handler
 async function moveThemeToGroup(themeId, themeName, targetGroupName) {
     const data = await browser.storage.local.get('userThemes');
