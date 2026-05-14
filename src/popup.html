@@ -7,11 +7,19 @@
   </head>
   <body>
     <div class="container">
-      <h2>Anonymous Theme Switcher</h2>
+      <div class="top-bar">
+        <h2>Anonymous Theme Switcher</h2>
+        <button id="search-toggle" class="search-toggle-btn" title="Search themes">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="11" cy="11" r="8"></circle>
+            <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+        </button>
+      </div>
 
       <p class="status">Ready to capture themes.</p>
 
-      <div class="search-bar">
+      <div class="search-bar" id="search-panel" style="display: none;">
         <svg class="search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#555" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="11" cy="11" r="8"></circle>
           <line x1="21" y1="21" x2="16.65" y2="16.65"></line>

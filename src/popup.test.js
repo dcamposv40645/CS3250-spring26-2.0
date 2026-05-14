@@ -27,6 +27,8 @@ function makeFakeElement(tag) {
         appendChild(child) {
             this.children.push(child);
             this.firstChild = this.children[0] || null;
+            // track the parent so anchor.parentElement works in showGroupDropdown
+            if (child && typeof child === 'object') child.parentElement = this;
             return child;
         },
 
@@ -35,6 +37,9 @@ function makeFakeElement(tag) {
             this.children = this.children.filter(c => c !== child);
             this.firstChild = this.children[0] || null;
         },
+
+        // no-op remove so dropdown.remove() doesn't crash
+        remove() {},
 
         // saves event listeners so we can call them in tests
         addEventListener(event, fn) {
@@ -144,6 +149,7 @@ const {
     getOriginalThemeId,
     setLockedInTheme,
     setOriginalThemeId,
+    setSearchQuery,
 } = require('./popup');
 
 // ── Helper: set up fake storage data for a test ───────────────────────────────
@@ -190,9 +196,10 @@ beforeEach(() => {
         Object.assign(fakeStorage, obj);
     });
 
-    // Reset the two global variables in popup.js
+    // Reset the global variables in popup.js
     setLockedInTheme(null);
     setOriginalThemeId(null);
+    setSearchQuery('');
 });
 
 // =============================================================================
@@ -1119,5 +1126,431 @@ describe('initializePopup — group drag and within-group reorder', () => {
         const customTag = contentArea.children.find(el => el.className === 'group-custom-tag');
         expect(customTag).toBeTruthy();
         expect(customTag.textContent).toBe('Custom order');
+    });
+});
+
+// =============================================================================
+// TESTS FOR: initializePopup — search query filtering
+// =============================================================================
+describe('initializePopup — search filtering', () => {
+
+    test('keeps only groups whose name matches the query', async () => {
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 't1', name: 'Alpha' }),
+            makeTheme({ id: 't2', name: 'Beta' }),
+        ]);
+        setFakeStorage({
+            userThemes: [
+                { id: 't1', group: 'cats' },
+                { id: 't2', group: 'dogs' },
+            ]
+        });
+        setSearchQuery('cat');
+        await initializePopup();
+
+        const groups = fakeElements['popup-content'].children.filter(el => el.className === 'group-container');
+        // only the 'cats' group matches
+        expect(groups.length).toBe(1);
+    });
+
+    test('keeps a group and filters its themes when only the theme name matches', async () => {
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 't1', name: 'Alpha' }),
+            makeTheme({ id: 't2', name: 'Beta' }),
+        ]);
+        setFakeStorage({
+            userThemes: [
+                { id: 't1', group: 'cats' },
+                { id: 't2', group: 'cats' },
+            ]
+        });
+        setSearchQuery('alpha');
+        await initializePopup();
+
+        const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
+        const contentArea = groupWrapper.children.find(el => el.className === 'group-content');
+        // only the 'Alpha' theme row should appear
+        const rows = contentArea.children.filter(el => el.className === 'theme-item-row');
+        expect(rows.length).toBe(1);
+    });
+
+    test('removes a group entirely when no themes match the query', async () => {
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 't1', name: 'Alpha' })]);
+        setFakeStorage({ userThemes: [{ id: 't1', group: 'cats' }] });
+        setSearchQuery('zzznomatch');
+        await initializePopup();
+
+        const groups = fakeElements['popup-content'].children.filter(el => el.className === 'group-container');
+        expect(groups.length).toBe(0);
+    });
+
+    test('shows all groups again when query is cleared', async () => {
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 't1', name: 'Alpha' }),
+            makeTheme({ id: 't2', name: 'Beta' }),
+        ]);
+        setFakeStorage({
+            userThemes: [
+                { id: 't1', group: 'cats' },
+                { id: 't2', group: 'dogs' },
+            ]
+        });
+        // empty string query = no filter
+        setSearchQuery('');
+        await initializePopup();
+
+        const groups = fakeElements['popup-content'].children.filter(el => el.className === 'group-container');
+        expect(groups.length).toBe(2);
+    });
+});
+
+// =============================================================================
+// TESTS FOR: initializePopup — eye button hover preview
+// =============================================================================
+describe('initializePopup — eye button preview', () => {
+
+    test('grouped eye button mouseenter previews the theme and saves the original', async () => {
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 't1' })]);
+        setFakeStorage({ userThemes: [{ id: 't1', group: 'cats' }] });
+        await initializePopup();
+
+        // second getAll call happens inside the mouseenter handler
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 'other', name: 'Other', enabled: true }),
+            makeTheme({ id: 't1', enabled: false }),
+        ]);
+
+        const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
+        const contentArea = groupWrapper.children.find(el => el.className === 'group-content');
+        const row = contentArea.children.find(el => el.className === 'theme-item-row');
+        const eyeBtn = row.children.find(el => el.className === 'drag-handle');
+
+        await eyeBtn._listeners['mouseenter'][0]();
+
+        expect(browser.management.setEnabled).toHaveBeenCalledWith('t1', true);
+        expect(getOriginalThemeId()).toBe('other');
+    });
+
+    test('grouped eye button mouseenter does not save original when it is already the hovered theme', async () => {
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 't1', enabled: true })]);
+        setFakeStorage({ userThemes: [{ id: 't1', group: 'cats' }] });
+        await initializePopup();
+
+        // the currently active theme IS the theme being hovered — no need to save it
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 't1', enabled: true })]);
+
+        const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
+        const contentArea = groupWrapper.children.find(el => el.className === 'group-content');
+        const row = contentArea.children.find(el => el.className === 'theme-item-row');
+        const eyeBtn = row.children.find(el => el.className === 'drag-handle');
+
+        await eyeBtn._listeners['mouseenter'][0]();
+
+        // setEnabled still gets called to ensure theme is active
+        expect(browser.management.setEnabled).toHaveBeenCalledWith('t1', true);
+        // but originalThemeId should NOT be set to the same theme
+        expect(getOriginalThemeId()).toBeNull();
+    });
+
+    test('grouped eye button mouseleave restores the original theme', async () => {
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 't1' })]);
+        setFakeStorage({ userThemes: [{ id: 't1', group: 'cats' }] });
+        await initializePopup();
+
+        setOriginalThemeId('saved-original');
+
+        const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
+        const contentArea = groupWrapper.children.find(el => el.className === 'group-content');
+        const row = contentArea.children.find(el => el.className === 'theme-item-row');
+        const eyeBtn = row.children.find(el => el.className === 'drag-handle');
+
+        await eyeBtn._listeners['mouseleave'][0]();
+
+        expect(browser.management.setEnabled).toHaveBeenCalledWith('saved-original', true);
+    });
+
+    test('grouped eye button mouseleave does nothing if no original was saved', async () => {
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 't1' })]);
+        setFakeStorage({ userThemes: [{ id: 't1', group: 'cats' }] });
+        await initializePopup();
+
+        // originalThemeId is null from beforeEach, leave it that way
+        const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
+        const contentArea = groupWrapper.children.find(el => el.className === 'group-content');
+        const row = contentArea.children.find(el => el.className === 'theme-item-row');
+        const eyeBtn = row.children.find(el => el.className === 'drag-handle');
+
+        await eyeBtn._listeners['mouseleave'][0]();
+
+        expect(browser.management.setEnabled).not.toHaveBeenCalled();
+    });
+
+    test('ungrouped eye button mouseenter previews the theme and saves original', async () => {
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 'free', name: 'Free' })]);
+        setFakeStorage({ userThemes: [] });
+        await initializePopup();
+
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 'other', name: 'Other', enabled: true }),
+            makeTheme({ id: 'free', enabled: false }),
+        ]);
+
+        const rows = fakeElements['popup-content'].children.filter(el => el.className === 'theme-item-row');
+        const eyeBtn = rows[0].children.find(el => el.className === 'drag-handle');
+
+        await eyeBtn._listeners['mouseenter'][0]();
+
+        expect(browser.management.setEnabled).toHaveBeenCalledWith('free', true);
+        expect(getOriginalThemeId()).toBe('other');
+    });
+
+    test('ungrouped eye button mouseleave restores the original theme', async () => {
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 'free', name: 'Free' })]);
+        setFakeStorage({ userThemes: [] });
+        await initializePopup();
+
+        setOriginalThemeId('original-id');
+
+        const rows = fakeElements['popup-content'].children.filter(el => el.className === 'theme-item-row');
+        const eyeBtn = rows[0].children.find(el => el.className === 'drag-handle');
+
+        await eyeBtn._listeners['mouseleave'][0]();
+
+        expect(browser.management.setEnabled).toHaveBeenCalledWith('original-id', true);
+    });
+});
+
+// =============================================================================
+// TESTS FOR: initializePopup — grouped theme row drag events
+// =============================================================================
+describe('initializePopup — grouped row drag events', () => {
+
+    test('grouped theme row dragstart marks the fromGroup in drag data', async () => {
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 't1' })]);
+        setFakeStorage({ userThemes: [{ id: 't1', group: 'cats' }] });
+        await initializePopup();
+
+        const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
+        const contentArea = groupWrapper.children.find(el => el.className === 'group-content');
+        const row = contentArea.children.find(el => el.className === 'theme-item-row');
+
+        const dragEvent = {
+            dataTransfer: { data: {}, setData(k, v) { this.data[k] = v; }, getData(k) { return this.data[k] || ''; } }
+        };
+        row._listeners['dragstart'][0](dragEvent);
+
+        expect(dragEvent.dataTransfer.getData('fromGroup')).toBe('CATS');
+    });
+
+    test('dropping a theme from a different group onto a theme row moves it there', async () => {
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 'ta', name: 'A' }),
+            makeTheme({ id: 'tb', name: 'B' }),
+        ]);
+        setFakeStorage({
+            userThemes: [
+                { id: 'ta', group: 'cats' },
+                { id: 'tb', group: 'dogs' },
+            ]
+        });
+        await initializePopup();
+
+        // groups render in insertion order: cats first, then dogs
+        const groups = fakeElements['popup-content'].children.filter(el => el.className === 'group-container');
+        const catsGroup = groups[0];
+        const contentArea = catsGroup.children.find(el => el.className === 'group-content');
+        // cats only has 'ta'
+        const row = contentArea.children.find(el => el.className === 'theme-item-row');
+
+        const dropEvent = {
+            preventDefault: jest.fn(),
+            stopPropagation: jest.fn(),
+            dataTransfer: {
+                data: { 'text/plain': 'tb', themeName: 'B', fromGroup: 'DOGS' },
+                getData(k) { return this.data[k] || ''; },
+            },
+        };
+        await row._listeners['drop'][0](dropEvent);
+
+        // 'tb' should now be in the CATS group
+        expect(fakeStorage.userThemes.find(t => t.id === 'tb').group).toBe('CATS');
+    });
+
+    test('dropping with no themeId onto a theme row does nothing', async () => {
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 't1' })]);
+        setFakeStorage({ userThemes: [{ id: 't1', group: 'cats' }] });
+        await initializePopup();
+
+        const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
+        const contentArea = groupWrapper.children.find(el => el.className === 'group-content');
+        const row = contentArea.children.find(el => el.className === 'theme-item-row');
+
+        const dropEvent = {
+            preventDefault: jest.fn(),
+            stopPropagation: jest.fn(),
+            dataTransfer: {
+                data: {}, // no text/plain
+                getData(k) { return this.data[k] || ''; },
+            },
+        };
+        const initialLength = fakeStorage.userThemes.length;
+        await row._listeners['drop'][0](dropEvent);
+
+        expect(fakeStorage.userThemes.length).toBe(initialLength);
+    });
+});
+
+// =============================================================================
+// TESTS FOR: initializePopup — ungrouped row events and group dropdown
+// =============================================================================
+describe('initializePopup — ungrouped row events and dropdown', () => {
+
+    test('ungrouped row dragstart marks fromGroup as __ungrouped__', async () => {
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 'a', name: 'Alpha' })]);
+        setFakeStorage({ userThemes: [] });
+        await initializePopup();
+
+        const rows = fakeElements['popup-content'].children.filter(el => el.className === 'theme-item-row');
+        const dragEvent = {
+            dataTransfer: { data: {}, setData(k, v) { this.data[k] = v; }, getData(k) { return this.data[k] || ''; } }
+        };
+        rows[0]._listeners['dragstart'][0](dragEvent);
+
+        expect(dragEvent.dataTransfer.getData('fromGroup')).toBe('__ungrouped__');
+    });
+
+    test('clicking the ungrouped custom order tag resets ungroupedOrder to null', async () => {
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 'a', name: 'Alpha' }),
+            makeTheme({ id: 'b', name: 'Beta' }),
+        ]);
+        setFakeStorage({ userThemes: [], ungroupedOrder: ['b', 'a'] });
+        await initializePopup();
+
+        const headerRow = fakeElements['popup-content'].children.find(el => el.className === 'ungrouped-header-row');
+        const customTag = headerRow.children.find(el => el.className.includes('group-custom-tag'));
+
+        // need getAll ready for the internal initializePopup call after reset
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 'a', name: 'Alpha' }),
+            makeTheme({ id: 'b', name: 'Beta' }),
+        ]);
+        await customTag.onclick();
+
+        expect(fakeStorage.ungroupedOrder).toBeNull();
+    });
+
+    test('addToGroupBtn opens a dropdown listing existing groups', async () => {
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 'grouped' }),
+            makeTheme({ id: 'free', name: 'Free' }),
+        ]);
+        setFakeStorage({ userThemes: [{ id: 'grouped', group: 'cats' }] });
+        await initializePopup();
+
+        const rows = fakeElements['popup-content'].children.filter(el => el.className === 'theme-item-row');
+        const addBtn = rows[0].children.find(el => el.className === 'add-to-group-btn');
+        addBtn.onclick({ stopPropagation: jest.fn() });
+
+        // dropdown is appended to addBtn.parentElement (the row)
+        const dropdown = rows[0].children.find(el => el.className === 'group-dropdown');
+        expect(dropdown).toBeTruthy();
+        const catItem = dropdown.children.find(c => c.textContent === 'CATS');
+        expect(catItem).toBeTruthy();
+    });
+
+    test('addToGroupBtn dropdown shows "No groups yet" when no groups exist', async () => {
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 'free', name: 'Free' })]);
+        setFakeStorage({ userThemes: [] });
+        await initializePopup();
+
+        const rows = fakeElements['popup-content'].children.filter(el => el.className === 'theme-item-row');
+        const addBtn = rows[0].children.find(el => el.className === 'add-to-group-btn');
+        addBtn.onclick({ stopPropagation: jest.fn() });
+
+        const dropdown = rows[0].children.find(el => el.className === 'group-dropdown');
+        const disabled = dropdown.children.find(c => c.className === 'group-dropdown-item group-dropdown-disabled');
+        expect(disabled).toBeTruthy();
+        expect(disabled.textContent).toBe('No groups yet');
+    });
+
+    test('clicking a group item in the dropdown moves the theme into that group', async () => {
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 'grouped' }),
+            makeTheme({ id: 'free', name: 'Free' }),
+        ]);
+        setFakeStorage({ userThemes: [{ id: 'grouped', group: 'cats' }] });
+        await initializePopup();
+
+        const rows = fakeElements['popup-content'].children.filter(el => el.className === 'theme-item-row');
+        const addBtn = rows[0].children.find(el => el.className === 'add-to-group-btn');
+        addBtn.onclick({ stopPropagation: jest.fn() });
+
+        const dropdown = rows[0].children.find(el => el.className === 'group-dropdown');
+        const catItem = dropdown.children.find(c => c.textContent === 'CATS');
+
+        // internal initializePopup call needs getAll ready
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 'grouped' }),
+            makeTheme({ id: 'free', name: 'Free' }),
+        ]);
+        await catItem.onclick();
+
+        expect(fakeStorage.userThemes.find(t => t.id === 'free').group).toBe('CATS');
+    });
+
+    test('clicking "+ New group..." prompts for a name and saves the theme there', async () => {
+        global.prompt = jest.fn(() => 'My New Group');
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 'free', name: 'Free' })]);
+        setFakeStorage({ userThemes: [] });
+        await initializePopup();
+
+        const rows = fakeElements['popup-content'].children.filter(el => el.className === 'theme-item-row');
+        const addBtn = rows[0].children.find(el => el.className === 'add-to-group-btn');
+        addBtn.onclick({ stopPropagation: jest.fn() });
+
+        const dropdown = rows[0].children.find(el => el.className === 'group-dropdown');
+        const newItem = dropdown.children.find(c => c.className === 'group-dropdown-item group-dropdown-new');
+
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 'free', name: 'Free' })]);
+        await newItem.onclick();
+
+        expect(fakeStorage.userThemes).toContainEqual(
+            expect.objectContaining({ id: 'free', group: 'My New Group' })
+        );
+    });
+
+    test('clicking "+ New group..." with blank input does nothing', async () => {
+        global.prompt = jest.fn(() => '   ');
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 'free', name: 'Free' })]);
+        setFakeStorage({ userThemes: [] });
+        await initializePopup();
+
+        const rows = fakeElements['popup-content'].children.filter(el => el.className === 'theme-item-row');
+        const addBtn = rows[0].children.find(el => el.className === 'add-to-group-btn');
+        addBtn.onclick({ stopPropagation: jest.fn() });
+
+        const dropdown = rows[0].children.find(el => el.className === 'group-dropdown');
+        const newItem = dropdown.children.find(c => c.className === 'group-dropdown-item group-dropdown-new');
+
+        await newItem.onclick();
+
+        // blank prompt = no save
+        expect(fakeStorage.userThemes).toHaveLength(0);
+    });
+
+    test('dropdown also shows a "+ New group..." item', async () => {
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 'free', name: 'Free' })]);
+        setFakeStorage({ userThemes: [] });
+        await initializePopup();
+
+        const rows = fakeElements['popup-content'].children.filter(el => el.className === 'theme-item-row');
+        const addBtn = rows[0].children.find(el => el.className === 'add-to-group-btn');
+        addBtn.onclick({ stopPropagation: jest.fn() });
+
+        const dropdown = rows[0].children.find(el => el.className === 'group-dropdown');
+        const newItem = dropdown.children.find(c => c.className === 'group-dropdown-item group-dropdown-new');
+        expect(newItem).toBeTruthy();
+        expect(newItem.textContent).toBe('+ New group...');
     });
 });

@@ -594,6 +594,27 @@ if (shutdown) {
     shutdown.addEventListener('click', () => window.close());
 }
 
+const searchToggle = document.getElementById('search-toggle');
+const searchPanel = document.getElementById('search-panel');
+if (searchToggle && searchPanel) {
+    searchToggle.addEventListener('click', () => {
+        const isOpen = searchPanel.style.display === 'flex';
+        searchPanel.style.display = isOpen ? 'none' : 'flex';
+        searchToggle.classList.toggle('active', !isOpen);
+        if (!isOpen) {
+            // focus the input when the bar opens
+            const input = document.getElementById('search-input');
+            if (input) input.focus();
+        } else {
+            // clear the search when the bar closes
+            searchQuery = '';
+            const input = document.getElementById('search-input');
+            if (input) input.value = '';
+            initializePopup();
+        }
+    });
+}
+
 const searchInput = document.getElementById('search-input');
 if (searchInput) {
     searchInput.addEventListener('input', (e) => {
@@ -859,6 +880,7 @@ if (typeof module !== 'undefined' && module.exports) {
         getLockedInTheme: () => lockedInTheme,
         setOriginalThemeId: (v) => { originalThemeId = v; },
         setLockedInTheme: (v) => { lockedInTheme = v; },
+        setSearchQuery: (v) => { searchQuery = v; },
     };
 }
 /* eslint-enable no-undef */
