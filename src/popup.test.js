@@ -136,6 +136,10 @@ const {
     saveTheme,
     handleDeleteGroup,
     handleRemoveTheme,
+    handleRenameGroup,
+    reorderGroup,
+    reorderThemeInGroup,
+    reorderUngroupedTheme,
     getLockedInTheme,
     getOriginalThemeId,
     setLockedInTheme,
@@ -719,5 +723,401 @@ describe('Drag and Drop Mechanics', () => {
 
         // Storage shouldn't change
         expect(fakeStorage.userThemes.length).toBe(1);
+    });
+});
+
+// =============================================================================
+// TESTS FOR: reorderGroup()
+// =============================================================================
+describe('reorderGroup', () => {
+
+    beforeEach(() => {
+        browser.management.getAll.mockResolvedValue([]);
+    });
+
+    test('moves a group from one position to another', async () => {
+        setFakeStorage({});
+        await reorderGroup('B', 'C', ['A', 'B', 'C']);
+        expect(fakeStorage.groupOrder).toEqual(['A', 'C', 'B']);
+    });
+
+    test('moves a group forward in the list', async () => {
+        setFakeStorage({});
+        await reorderGroup('A', 'C', ['A', 'B', 'C']);
+        expect(fakeStorage.groupOrder).toEqual(['B', 'C', 'A']);
+    });
+
+    test('does nothing if the dragged group is not in the list', async () => {
+        setFakeStorage({});
+        await reorderGroup('X', 'A', ['A', 'B', 'C']);
+        expect(fakeStorage.groupOrder).toBeUndefined();
+    });
+
+    test('does nothing if the target group is not in the list', async () => {
+        setFakeStorage({});
+        await reorderGroup('A', 'X', ['A', 'B', 'C']);
+        expect(fakeStorage.groupOrder).toBeUndefined();
+    });
+
+    test('does nothing if dragged and target are the same group', async () => {
+        setFakeStorage({});
+        await reorderGroup('A', 'A', ['A', 'B', 'C']);
+        expect(fakeStorage.groupOrder).toBeUndefined();
+    });
+
+    test('saves the new order to storage', async () => {
+        setFakeStorage({});
+        await reorderGroup('B', 'A', ['A', 'B', 'C']);
+        expect(browser.storage.local.set).toHaveBeenCalledWith({ groupOrder: ['B', 'A', 'C'] });
+    });
+});
+
+// =============================================================================
+// TESTS FOR: reorderThemeInGroup()
+// =============================================================================
+describe('reorderThemeInGroup', () => {
+
+    beforeEach(() => {
+        browser.management.getAll.mockResolvedValue([]);
+    });
+
+    test('reorders themes within a group and saves to groupThemeOrder', async () => {
+        setFakeStorage({ groupThemeOrder: {} });
+        const themes = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+        await reorderThemeInGroup('a', 'c', 'CATS', themes);
+        expect(fakeStorage.groupThemeOrder['CATS']).toEqual(['b', 'c', 'a']);
+    });
+
+    test('moves a theme earlier in the list', async () => {
+        setFakeStorage({ groupThemeOrder: {} });
+        const themes = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+        await reorderThemeInGroup('c', 'a', 'CATS', themes);
+        expect(fakeStorage.groupThemeOrder['CATS']).toEqual(['c', 'a', 'b']);
+    });
+
+    test('does nothing if the dragged theme id is not found', async () => {
+        setFakeStorage({});
+        const themes = [{ id: 'a' }, { id: 'b' }];
+        await reorderThemeInGroup('x', 'a', 'CATS', themes);
+        expect(fakeStorage.groupThemeOrder).toBeUndefined();
+    });
+
+    test('does nothing if dragged and target are the same theme', async () => {
+        setFakeStorage({});
+        const themes = [{ id: 'a' }, { id: 'b' }];
+        await reorderThemeInGroup('a', 'a', 'CATS', themes);
+        expect(fakeStorage.groupThemeOrder).toBeUndefined();
+    });
+
+    test('preserves other groups when saving custom order', async () => {
+        setFakeStorage({ groupThemeOrder: { DOGS: ['d1', 'd2'] } });
+        const themes = [{ id: 'a' }, { id: 'b' }];
+        await reorderThemeInGroup('b', 'a', 'CATS', themes);
+        expect(fakeStorage.groupThemeOrder['DOGS']).toEqual(['d1', 'd2']);
+        expect(fakeStorage.groupThemeOrder['CATS']).toEqual(['b', 'a']);
+    });
+});
+
+// =============================================================================
+// TESTS FOR: reorderUngroupedTheme()
+// =============================================================================
+describe('reorderUngroupedTheme', () => {
+
+    beforeEach(() => {
+        browser.management.getAll.mockResolvedValue([]);
+    });
+
+    test('reorders ungrouped themes and saves to ungroupedOrder', async () => {
+        setFakeStorage({});
+        const themes = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+        await reorderUngroupedTheme('a', 'c', themes);
+        expect(fakeStorage.ungroupedOrder).toEqual(['b', 'c', 'a']);
+    });
+
+    test('moves a theme earlier in the ungrouped list', async () => {
+        setFakeStorage({});
+        const themes = [{ id: 'a' }, { id: 'b' }, { id: 'c' }];
+        await reorderUngroupedTheme('c', 'a', themes);
+        expect(fakeStorage.ungroupedOrder).toEqual(['c', 'a', 'b']);
+    });
+
+    test('does nothing if dragged theme is not found', async () => {
+        setFakeStorage({});
+        const themes = [{ id: 'a' }, { id: 'b' }];
+        await reorderUngroupedTheme('x', 'a', themes);
+        expect(fakeStorage.ungroupedOrder).toBeUndefined();
+    });
+
+    test('does nothing if dragged and target are the same theme', async () => {
+        setFakeStorage({});
+        const themes = [{ id: 'a' }, { id: 'b' }];
+        await reorderUngroupedTheme('a', 'a', themes);
+        expect(fakeStorage.ungroupedOrder).toBeUndefined();
+    });
+
+    test('saves the new order to storage', async () => {
+        setFakeStorage({});
+        const themes = [{ id: 'a' }, { id: 'b' }];
+        await reorderUngroupedTheme('b', 'a', themes);
+        expect(browser.storage.local.set).toHaveBeenCalledWith({ ungroupedOrder: ['b', 'a'] });
+    });
+});
+
+// =============================================================================
+// TESTS FOR: handleRenameGroup()
+// =============================================================================
+describe('handleRenameGroup', () => {
+
+    beforeEach(() => {
+        browser.management.getAll.mockResolvedValue([]);
+        global.prompt = jest.fn();
+    });
+
+    test('updates the group name for all themes in that group', async () => {
+        global.prompt.mockReturnValue('Dogs');
+        setFakeStorage({
+            userThemes: [
+                { id: 't1', group: 'Cats' },
+                { id: 't2', group: 'Cats' },
+                { id: 't3', group: 'Birds' },
+            ]
+        });
+        await handleRenameGroup('CATS');
+        expect(fakeStorage.userThemes.filter(t => t.group === 'Dogs').length).toBe(2);
+        expect(fakeStorage.userThemes.find(t => t.id === 't3').group).toBe('Birds');
+    });
+
+    test('does nothing if the user cancels the prompt', async () => {
+        global.prompt.mockReturnValue(null);
+        setFakeStorage({ userThemes: [{ id: 't1', group: 'Cats' }] });
+        await handleRenameGroup('CATS');
+        expect(browser.storage.local.set).not.toHaveBeenCalled();
+    });
+
+    test('does nothing if the user submits an empty string', async () => {
+        global.prompt.mockReturnValue('   ');
+        setFakeStorage({ userThemes: [{ id: 't1', group: 'Cats' }] });
+        await handleRenameGroup('CATS');
+        expect(browser.storage.local.set).not.toHaveBeenCalled();
+    });
+
+    test('does nothing if the new name is the same as the old name', async () => {
+        global.prompt.mockReturnValue('cats');
+        setFakeStorage({ userThemes: [{ id: 't1', group: 'CATS' }] });
+        await handleRenameGroup('CATS');
+        expect(browser.storage.local.set).not.toHaveBeenCalled();
+    });
+
+    test('also updates groupOrder if a custom group order exists', async () => {
+        global.prompt.mockReturnValue('Hounds');
+        setFakeStorage({
+            userThemes: [{ id: 't1', group: 'Dogs' }],
+            groupOrder: ['CATS', 'DOGS', 'BIRDS'],
+        });
+        await handleRenameGroup('DOGS');
+        expect(fakeStorage.groupOrder).toEqual(['CATS', 'HOUNDS', 'BIRDS']);
+    });
+
+    test('leaves groupOrder unchanged if the group is not in it', async () => {
+        global.prompt.mockReturnValue('Hounds');
+        setFakeStorage({
+            userThemes: [{ id: 't1', group: 'Dogs' }],
+            groupOrder: ['CATS', 'BIRDS'],
+        });
+        await handleRenameGroup('DOGS');
+        expect(fakeStorage.groupOrder).toEqual(['CATS', 'BIRDS']);
+    });
+});
+
+// =============================================================================
+// TESTS FOR: initializePopup — ungrouped custom order
+// =============================================================================
+describe('initializePopup — ungrouped custom order', () => {
+
+    test('renders ungrouped themes in saved ungroupedOrder', async () => {
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 'a', name: 'Alpha' }),
+            makeTheme({ id: 'b', name: 'Beta' }),
+            makeTheme({ id: 'c', name: 'Gamma' }),
+        ]);
+        setFakeStorage({ userThemes: [], ungroupedOrder: ['c', 'a', 'b'] });
+        await initializePopup();
+
+        const rows = fakeElements['popup-content'].children.filter(el => el.className === 'theme-item-row');
+        const names = rows.map(r => r.children.find(c => c.className.includes('theme-button')).textContent);
+        expect(names).toEqual(['Gamma', 'Alpha', 'Beta']);
+    });
+
+    test('shows a custom order tag when ungroupedOrder is set', async () => {
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 'a', name: 'Alpha' }),
+            makeTheme({ id: 'b', name: 'Beta' }),
+        ]);
+        setFakeStorage({ userThemes: [], ungroupedOrder: ['b', 'a'] });
+        await initializePopup();
+
+        // Tag lives inside the ungrouped-header-row div
+        const headerRow = fakeElements['popup-content'].children.find(el => el.className === 'ungrouped-header-row');
+        const customTag = headerRow && headerRow.children.find(el => el.className.includes('group-custom-tag'));
+        expect(customTag).toBeTruthy();
+        expect(customTag.textContent).toBe('Custom order');
+    });
+
+    test('does not show a custom order tag when no ungroupedOrder is saved', async () => {
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 'a', name: 'Alpha' })]);
+        setFakeStorage({ userThemes: [] });
+        await initializePopup();
+
+        const headerRow = fakeElements['popup-content'].children.find(el => el.className === 'ungrouped-header-row');
+        const customTag = headerRow && headerRow.children.find(el => el.className.includes('group-custom-tag'));
+        expect(customTag).toBeFalsy();
+    });
+
+    test('ungrouped row drop with same group triggers reorderUngroupedTheme path', async () => {
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 'a', name: 'Alpha' }),
+            makeTheme({ id: 'b', name: 'Beta' }),
+            makeTheme({ id: 'c', name: 'Gamma' }),
+        ]);
+        // No custom order; default 'recent' reverses installed order → rendered as [c, b, a]
+        setFakeStorage({ userThemes: [] });
+        await initializePopup();
+
+        const rows = fakeElements['popup-content'].children.filter(el => el.className === 'theme-item-row');
+        // Drop 'a' (at rows[2]) onto 'b' (at rows[1]): fromIdx=2, toIdx=1 in [c,b,a] → result [c,a,b]
+        const dropEvent = {
+            preventDefault: jest.fn(),
+            stopPropagation: jest.fn(),
+            dataTransfer: {
+                data: { 'text/plain': 'a', fromGroup: '__ungrouped__' },
+                getData(k) { return this.data[k] || ''; },
+            },
+        };
+        await rows[1]._listeners['drop'][0](dropEvent);
+        expect(fakeStorage.ungroupedOrder).toEqual(['c', 'a', 'b']);
+    });
+
+    test('ungrouped row drop with groupDrag set does nothing', async () => {
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 'a', name: 'Alpha' })]);
+        setFakeStorage({ userThemes: [] });
+        await initializePopup();
+
+        const rows = fakeElements['popup-content'].children.filter(el => el.className === 'theme-item-row');
+        const dropEvent = {
+            preventDefault: jest.fn(),
+            stopPropagation: jest.fn(),
+            dataTransfer: {
+                data: { groupDrag: 'CATS' },
+                getData(k) { return this.data[k] || ''; },
+            },
+        };
+        await rows[0]._listeners['drop'][0](dropEvent);
+        expect(fakeStorage.ungroupedOrder).toBeUndefined();
+    });
+});
+
+// =============================================================================
+// TESTS FOR: initializePopup — group drag handle & within-group reorder
+// =============================================================================
+describe('initializePopup — group drag and within-group reorder', () => {
+
+    test('group drag handle sets groupDrag data on dragstart', async () => {
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 't1' })]);
+        setFakeStorage({ userThemes: [{ id: 't1', group: 'cats' }] });
+        await initializePopup();
+
+        const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
+        const headerContainer = groupWrapper.children.find(el => el.className === 'group-header-container');
+        const dragHandle = headerContainer.children.find(el => el.className === 'group-drag-handle');
+
+        const dragEvent = {
+            dataTransfer: { data: {}, setData(k, v) { this.data[k] = v; }, getData(k) { return this.data[k]; }, setDragImage: jest.fn() },
+            stopPropagation: jest.fn(),
+        };
+        dragHandle._listeners['dragstart'][0](dragEvent);
+        expect(dragEvent.dataTransfer.getData('groupDrag')).toBe('CATS');
+        expect(dragEvent.stopPropagation).toHaveBeenCalled();
+    });
+
+    test('group wrapper drop with groupDrag calls reorderGroup storage save', async () => {
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 't1' }),
+            makeTheme({ id: 't2', name: 'Theme 2' }),
+        ]);
+        setFakeStorage({
+            userThemes: [
+                { id: 't1', group: 'cats' },
+                { id: 't2', group: 'dogs' },
+            ],
+        });
+        await initializePopup();
+
+        const groups = fakeElements['popup-content'].children.filter(el => el.className === 'group-container');
+        const dogsWrapper = groups[1]; // second group rendered
+
+        const dropEvent = {
+            preventDefault: jest.fn(),
+            dataTransfer: {
+                data: { groupDrag: 'CATS' },
+                getData(k) { return this.data[k] || ''; },
+            },
+        };
+        dogsWrapper.classList.remove = jest.fn();
+        await dogsWrapper._listeners['drop'][0](dropEvent);
+
+        expect(fakeStorage.groupOrder).toBeDefined();
+    });
+
+    test('within-group theme row drop fires reorderThemeInGroup when same group', async () => {
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 'ta', name: 'A Theme' }),
+            makeTheme({ id: 'tb', name: 'B Theme' }),
+        ]);
+        setFakeStorage({
+            userThemes: [
+                { id: 'ta', group: 'cats' },
+                { id: 'tb', group: 'cats' },
+            ],
+        });
+        await initializePopup();
+
+        const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
+        const contentArea = groupWrapper.children.find(el => el.className === 'group-content');
+        const rows = contentArea.children.filter(el => el.className === 'theme-item-row');
+
+        const dropEvent = {
+            preventDefault: jest.fn(),
+            stopPropagation: jest.fn(),
+            dataTransfer: {
+                data: { 'text/plain': 'ta', themeName: 'A Theme', fromGroup: 'CATS' },
+                getData(k) { return this.data[k] || ''; },
+            },
+        };
+        // 'recent' sort renders [tb, ta]; drop 'ta' onto rows[0] (tb)
+        // fromIdx=1, toIdx=0 in [tb,ta] → result [ta, tb]
+        await rows[0]._listeners['drop'][0](dropEvent);
+        expect(fakeStorage.groupThemeOrder).toBeDefined();
+        expect(fakeStorage.groupThemeOrder['CATS']).toEqual(['ta', 'tb']);
+    });
+
+    test('shows custom order tag inside group when groupThemeOrder is set for that group', async () => {
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 't1' }),
+            makeTheme({ id: 't2', name: 'T2' }),
+        ]);
+        setFakeStorage({
+            userThemes: [
+                { id: 't1', group: 'cats' },
+                { id: 't2', group: 'cats' },
+            ],
+            groupThemeOrder: { CATS: ['t2', 't1'] },
+        });
+        await initializePopup();
+
+        const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
+        const contentArea = groupWrapper.children.find(el => el.className === 'group-content');
+        const customTag = contentArea.children.find(el => el.className === 'group-custom-tag');
+        expect(customTag).toBeTruthy();
+        expect(customTag.textContent).toBe('Custom order');
     });
 });

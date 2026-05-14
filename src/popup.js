@@ -46,18 +46,26 @@ let searchQuery = ''; // Tracks the current search filter
 // this function has some asistance from ai
 //Prompt: whats the best way to check and access themes that we own in firefox
 async function initializePopup() {
+    const scrollTop = document.documentElement.scrollTop || document.body.scrollTop || 0;
     const currentDiv = document.getElementById('popup-content');
     if (!currentDiv) return;
 
-    // 1. Get ALL installed themes and your saved Group data
+    // 1. Fetch ALL data before touching the DOM — every await after a DOM clear
+    //    gives the browser a chance to render the empty popup (causing the flash).
     const allAddons = await browser.management.getAll();
     const storageData = await browser.storage.local.get('userThemes');
+    const groupOrderData = await browser.storage.local.get('groupOrder');
+    const groupThemeOrderData = await browser.storage.local.get('groupThemeOrder');
+    const ungroupedOrderData = await browser.storage.local.get('ungroupedOrder');
 
     const installedThemes = allAddons.filter(addon => addon.type === 'theme');
     const activeTheme = installedThemes.find(t => t.enabled);
     const savedThemes = storageData.userThemes || [];
+    const savedGroupOrder = groupOrderData.groupOrder || null;
+    const groupThemeOrder = groupThemeOrderData.groupThemeOrder || {};
+    const ungroupedOrder = ungroupedOrderData.ungroupedOrder || null;
 
-    // 2. Remember which groups were open, then clear the old list before redrawing
+    // 2. Remember which groups were open, then clear and rebuild — all synchronous from here
     const openGroups = new Set();
     currentDiv.querySelectorAll('.group-content').forEach((el, i) => {
         if (el.style.display !== 'none') {
@@ -98,13 +106,33 @@ async function initializePopup() {
         }
     }
 
-    // Sort themes inside each group before rendering based on the current sort order
+    // Sort themes inside each group — use per-group custom order if set, otherwise global sort
     for (const g in themeGroups) {
-        themeGroups[g].sort((a, b) => {
-            if (currentSort === 'az') return a.name.localeCompare(b.name);
-            if (currentSort === 'oldest') return savedThemes.findIndex(s => s.id === a.id) - savedThemes.findIndex(s => s.id === b.id);
-            return savedThemes.findIndex(s => s.id === b.id) - savedThemes.findIndex(s => s.id === a.id);
-        });
+        if (groupThemeOrder[g]) {
+            const customOrder = groupThemeOrder[g];
+            themeGroups[g].sort((a, b) => {
+                const ai = customOrder.indexOf(a.id);
+                const bi = customOrder.indexOf(b.id);
+                if (ai === -1) return 1;
+                if (bi === -1) return -1;
+                return ai - bi;
+            });
+        } else {
+            themeGroups[g].sort((a, b) => {
+                if (currentSort === 'az') return a.name.localeCompare(b.name);
+                if (currentSort === 'oldest') return savedThemes.findIndex(s => s.id === a.id) - savedThemes.findIndex(s => s.id === b.id);
+                return savedThemes.findIndex(s => s.id === b.id) - savedThemes.findIndex(s => s.id === a.id);
+            });
+        }
+    }
+
+    // Determine group rendering order: custom if dragged, otherwise insertion order
+    let orderedGroupNames = Object.keys(themeGroups);
+    if (savedGroupOrder) {
+        orderedGroupNames = [
+            ...savedGroupOrder.filter(n => themeGroups[n] !== undefined),
+            ...orderedGroupNames.filter(n => !savedGroupOrder.includes(n))
+        ];
     }
 
     // 4. Build the Expandable UI (Accordion)
@@ -123,14 +151,26 @@ async function initializePopup() {
         const key = label === 'A-Z' ? 'az' : label.toLowerCase();
         const btn = document.createElement('button');
         btn.textContent = label;
-        btn.className = 'sort-btn' + (currentSort === key ? ' sort-active' : '');
+        btn.className = 'sort-btn' + (currentSort === key && !savedGroupOrder ? ' sort-active' : '');
         btn.onclick = () => { currentSort = key; initializePopup(); };
         sortBar.appendChild(btn);
     });
 
+    if (savedGroupOrder) {
+        const customBtn = document.createElement('button');
+        customBtn.textContent = 'Custom';
+        customBtn.className = 'sort-btn sort-active';
+        customBtn.title = 'Groups are in custom order — click to reset';
+        customBtn.onclick = async () => {
+            await browser.storage.local.remove('groupOrder');
+            initializePopup();
+        };
+        sortBar.appendChild(customBtn);
+    }
+
     currentDiv.appendChild(sortBar);
 
-    for (const groupName in themeGroups) {
+    for (const groupName of orderedGroupNames) {
         const groupWrapper = document.createElement('div');
         groupWrapper.className = 'group-container';
 
@@ -148,6 +188,12 @@ async function initializePopup() {
         groupWrapper.addEventListener('drop', async (e) => {
             e.preventDefault();
             groupWrapper.classList.remove('drag-over');
+
+            const draggedGroup = e.dataTransfer.getData('groupDrag');
+            if (draggedGroup && draggedGroup !== groupName) {
+                await reorderGroup(draggedGroup, groupName, orderedGroupNames);
+                return;
+            }
 
             const themeId = e.dataTransfer.getData('text/plain');
             const themeName = e.dataTransfer.getData('themeName');
@@ -190,6 +236,21 @@ async function initializePopup() {
         const contentArea = document.createElement('div');
         contentArea.className = 'group-content';
         contentArea.style.display = openGroups.has(Object.keys(themeGroups).indexOf(groupName)) ? "block" : "none";
+
+        if (groupThemeOrder[groupName]) {
+            const customTag = document.createElement('button');
+            customTag.textContent = 'Custom order';
+            customTag.className = 'group-custom-tag';
+            customTag.title = 'Themes are in custom order — click to reset';
+            customTag.onclick = async () => {
+                const d = await browser.storage.local.get('groupThemeOrder');
+                const gto = d.groupThemeOrder || {};
+                delete gto[groupName];
+                await browser.storage.local.set({ groupThemeOrder: gto });
+                initializePopup();
+            };
+            contentArea.appendChild(customTag);
+        }
 
         // Loop that adds drag handle + Theme + Remove "x" Button
         themeGroups[groupName].forEach(theme => {
@@ -243,6 +304,27 @@ async function initializePopup() {
             tooltip.className = 'drag-tooltip';
             tooltip.textContent = 'drag to move between groups';
             row.appendChild(tooltip);
+
+            // Tag each row with its group so drop handler knows where the drag started
+            row.addEventListener('dragstart', (e) => {
+                e.dataTransfer.setData('fromGroup', groupName);
+            });
+            row.addEventListener('dragover', (e) => { e.preventDefault(); });
+            row.addEventListener('drop', async (e) => {
+                e.preventDefault();
+                if (e.dataTransfer.getData('groupDrag')) return; // let groupWrapper handle group reorders
+                e.stopPropagation();
+                const themeId = e.dataTransfer.getData('text/plain');
+                const themeName = e.dataTransfer.getData('themeName');
+                const fromGroup = e.dataTransfer.getData('fromGroup');
+                if (!themeId || themeId === theme.id) return;
+                if (fromGroup === groupName) {
+                    await reorderThemeInGroup(themeId, theme.id, groupName, themeGroups[groupName]);
+                } else {
+                    await moveThemeToGroup(themeId, themeName, groupName);
+                }
+            });
+
             contentArea.appendChild(row);
         });
 
@@ -257,6 +339,18 @@ async function initializePopup() {
             }
         });
 
+        const groupDragHandle = document.createElement('span');
+        groupDragHandle.className = 'group-drag-handle';
+        groupDragHandle.innerHTML = '⠿';
+        groupDragHandle.title = 'Drag to reorder group';
+        groupDragHandle.draggable = true;
+        groupDragHandle.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('groupDrag', groupName);
+            e.dataTransfer.setDragImage(groupWrapper, 15, 15);
+            e.stopPropagation();
+        });
+
+        headerContainer.appendChild(groupDragHandle);
         headerContainer.appendChild(header);
         headerContainer.appendChild(renameBtn);
         headerContainer.appendChild(delGroupBtn);
@@ -266,21 +360,47 @@ async function initializePopup() {
     }
 
     // 5. Add "Ungrouped" themes at the bottom
+    const ungroupedHeaderRow = document.createElement('div');
+    ungroupedHeaderRow.className = 'ungrouped-header-row';
     const otherHeader = document.createElement('h3');
     otherHeader.textContent = "Ungrouped Themes";
-    currentDiv.appendChild(otherHeader);
+    ungroupedHeaderRow.appendChild(otherHeader);
 
     const ungroupedThemes = installedThemes.filter(theme => {
         if (savedThemes.some(s => s.id === theme.id)) return false;
         return !q || theme.name.toLowerCase().includes(q);
     });
 
-    // Sort ungrouped themes using the same active sort order as the groups
-    ungroupedThemes.sort((a, b) => {
-        if (currentSort === 'az') return a.name.localeCompare(b.name);
-        if (currentSort === 'oldest') return installedThemes.indexOf(a) - installedThemes.indexOf(b);
-        return installedThemes.indexOf(b) - installedThemes.indexOf(a);
-    });
+    // Sort ungrouped themes — use custom order if set, otherwise global sort
+    if (ungroupedOrder) {
+        ungroupedThemes.sort((a, b) => {
+            const ai = ungroupedOrder.indexOf(a.id);
+            const bi = ungroupedOrder.indexOf(b.id);
+            if (ai === -1) return 1;
+            if (bi === -1) return -1;
+            return ai - bi;
+        });
+    } else {
+        ungroupedThemes.sort((a, b) => {
+            if (currentSort === 'az') return a.name.localeCompare(b.name);
+            if (currentSort === 'oldest') return installedThemes.indexOf(a) - installedThemes.indexOf(b);
+            return installedThemes.indexOf(b) - installedThemes.indexOf(a);
+        });
+    }
+
+    if (ungroupedOrder) {
+        const ungroupedCustomTag = document.createElement('button');
+        ungroupedCustomTag.textContent = 'Custom order';
+        ungroupedCustomTag.className = 'group-custom-tag ungrouped-custom-tag';
+        ungroupedCustomTag.title = 'Ungrouped themes are in custom order — click to reset';
+        ungroupedCustomTag.onclick = async () => {
+            await browser.storage.local.set({ ungroupedOrder: null });
+            initializePopup();
+        };
+        ungroupedHeaderRow.appendChild(ungroupedCustomTag);
+    }
+
+    currentDiv.appendChild(ungroupedHeaderRow);
 
     ungroupedThemes.forEach(theme => {
         const row = document.createElement('div');
@@ -335,11 +455,31 @@ async function initializePopup() {
         row.appendChild(addToGroupBtn);
         const tooltip = document.createElement('span');
         tooltip.className = 'drag-tooltip';
-        tooltip.textContent = 'drag to move between groups';
+        tooltip.textContent = 'drag to reorder';
         row.appendChild(tooltip);
+
+        row.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('fromGroup', '__ungrouped__');
+        });
+        row.addEventListener('dragover', (e) => { e.preventDefault(); });
+        row.addEventListener('drop', async (e) => {
+            e.preventDefault();
+            if (e.dataTransfer.getData('groupDrag')) return;
+            e.stopPropagation();
+            const draggedId = e.dataTransfer.getData('text/plain');
+            const fromGroup = e.dataTransfer.getData('fromGroup');
+            if (!draggedId || draggedId === theme.id) return;
+            if (fromGroup === '__ungrouped__') {
+                await reorderUngroupedTheme(draggedId, theme.id, ungroupedThemes);
+            }
+        });
+
         currentDiv.appendChild(row);
 
     });
+
+    document.documentElement.scrollTop = scrollTop;
+    document.body.scrollTop = scrollTop;
 }
 
 /**
@@ -524,7 +664,12 @@ async function handleRenameGroup(groupName) {
         }
     });
 
-    // Step 3: Save and refresh the UI
+    // Step 3: Save and refresh the UI (also update groupOrder if the group is in a custom order)
+    const gOrder = await browser.storage.local.get('groupOrder');
+    if (gOrder.groupOrder) {
+        const updatedOrder = gOrder.groupOrder.map(n => n === groupName ? newName.trim().toUpperCase() : n);
+        await browser.storage.local.set({ groupOrder: updatedOrder });
+    }
     await browser.storage.local.set({ userThemes: savedThemes });
     initializePopup();
 }
@@ -621,6 +766,70 @@ function showGroupDropdown(theme, anchor, groupNames) {
     }, 0);
 }
 
+/**
+ * Saves a new group order to storage after a group drag-drop reorder.
+ *
+ * @async
+ * @param {string} draggedGroupName - The group that was dragged.
+ * @param {string} targetGroupName - The group it was dropped onto.
+ * @param {string[]} currentOrder - The current ordered list of group names.
+ * @returns {Promise<void>}
+ */
+async function reorderGroup(draggedGroupName, targetGroupName, currentOrder) {
+    const order = [...currentOrder];
+    const fromIdx = order.indexOf(draggedGroupName);
+    const toIdx = order.indexOf(targetGroupName);
+    if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
+    order.splice(fromIdx, 1);
+    order.splice(toIdx, 0, draggedGroupName);
+    await browser.storage.local.set({ groupOrder: order });
+    initializePopup();
+}
+
+/**
+ * Reorders a theme within its group after a drag-drop, saving a custom order for that group.
+ *
+ * @async
+ * @param {string} draggedThemeId - The theme that was dragged.
+ * @param {string} targetThemeId - The theme it was dropped onto.
+ * @param {string} groupName - The group both themes belong to.
+ * @param {Object[]} currentGroupThemes - The currently rendered theme objects for the group.
+ * @returns {Promise<void>}
+ */
+async function reorderThemeInGroup(draggedThemeId, targetThemeId, groupName, currentGroupThemes) {
+    const data = await browser.storage.local.get('groupThemeOrder');
+    const groupThemeOrder = data.groupThemeOrder || {};
+    const order = currentGroupThemes.map(t => t.id);
+    const fromIdx = order.indexOf(draggedThemeId);
+    const toIdx = order.indexOf(targetThemeId);
+    if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
+    order.splice(fromIdx, 1);
+    order.splice(toIdx, 0, draggedThemeId);
+    groupThemeOrder[groupName] = order;
+    await browser.storage.local.set({ groupThemeOrder });
+    initializePopup();
+}
+
+/**
+ * Reorders a theme in the ungrouped section after a drag-drop.
+ *
+ * @async
+ * @param {string} draggedThemeId - The theme that was dragged.
+ * @param {string} targetThemeId - The theme it was dropped onto.
+ * @param {Object[]} currentUngrouped - The currently rendered ungrouped theme objects.
+ * @returns {Promise<void>}
+ */
+async function reorderUngroupedTheme(draggedThemeId, targetThemeId, currentUngrouped) {
+    const order = currentUngrouped.map(t => t.id);
+    const fromIdx = order.indexOf(draggedThemeId);
+    const toIdx = order.indexOf(targetThemeId);
+    if (fromIdx === -1 || toIdx === -1 || fromIdx === toIdx) return;
+    order.splice(fromIdx, 1);
+    order.splice(toIdx, 0, draggedThemeId);
+    await browser.storage.local.set({ ungroupedOrder: order });
+    initializePopup();
+}
+
 // move theme drop handler
 async function moveThemeToGroup(themeId, themeName, targetGroupName) {
     const data = await browser.storage.local.get('userThemes');
@@ -645,7 +854,7 @@ async function moveThemeToGroup(themeId, themeName, targetGroupName) {
 /* eslint-disable no-undef */
 if (typeof module !== 'undefined' && module.exports) {
     module.exports = {
-        initializePopup, buildMenuItem, saveTheme, handleDeleteGroup, handleRemoveTheme, handleRenameGroup,
+        initializePopup, buildMenuItem, saveTheme, handleDeleteGroup, handleRemoveTheme, handleRenameGroup, reorderGroup, reorderThemeInGroup, reorderUngroupedTheme,
         getOriginalThemeId: () => originalThemeId,
         getLockedInTheme: () => lockedInTheme,
         setOriginalThemeId: (v) => { originalThemeId = v; },

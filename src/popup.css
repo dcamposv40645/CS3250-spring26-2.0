@@ -174,10 +174,8 @@ button:hover {
 /* used Ai prompt: how can I give my groups a glow and a nice futuristic look */
 .group-container {
     margin: 12px 0;
-    border-left: 3px solid #00f3ff; /* Sharp neon bar stays */
     background-color: #121212;
     border-radius: 0;
-    /* Removed the heavy box-shadow glow */
 }
 
 /* The clickable Cyber header - sharp and clean */
@@ -186,8 +184,7 @@ button:hover {
     padding: 12px;
     background-color: #1a1a1a;
     color: #00f3ff;
-    /* Reduced glow to a very subtle "haze" */
-    text-shadow: 0 0 2px rgba(0, 243, 255, 0.3); 
+    text-shadow: 0 0 2px rgba(0, 243, 255, 0.3);
     text-align: left;
     border: none;
     cursor: pointer;
@@ -195,13 +192,19 @@ button:hover {
     letter-spacing: 1.5px;
     font-weight: bold;
     text-transform: uppercase;
+    margin-top: 0;
+    border-radius: 0;
 }
 
 .group-header:hover {
-    background-color: #222;
+    background: none;
     color: #ffffff;
-    /* Hover glow is now very tight and clear */
-    text-shadow: 0 0 5px #00f3ff; 
+    text-shadow: 0 0 5px #00f3ff;
+    box-shadow: none;
+}
+
+.group-header-container:hover {
+    box-shadow: 0 0 8px #00ff9d, inset 0 0 8px #00ff9d22;
 }
 
 .group-content {
@@ -231,23 +234,24 @@ button:hover {
     display: flex;
     align-items: center;
     background-color: #1a1a1a;
-    border-left: 3px solid #00f3ff; /* That clean neon blue accent */
     margin: 8px 0;
 }
 
 /* THE FIX: flex-grow: 1 makes the title take up all available space */
 .group-header {
-    flex-grow: 1; 
+    flex-grow: 1;
     padding: 12px;
     background: none;
     color: #00f3ff;
-    text-align: left; /* Keeps text on the left */
+    text-align: left;
     border: none;
     cursor: pointer;
     font-size: 13px;
     font-weight: bold;
     text-transform: uppercase;
     letter-spacing: 1.5px;
+    margin-top: 0;
+    border-radius: 0;
 }
 
 /* The Delete Button: Now small and stays on the far right */
@@ -405,6 +409,51 @@ button:hover {
     box-shadow: none;
     text-shadow: 0 0 8px #00f3ff;
 }
+/* Small "Custom order" tag shown inside a group when its themes are manually reordered */
+.group-custom-tag {
+    display: block;
+    width: auto;
+    margin: 6px 10px 2px;
+    padding: 3px 10px;
+    font-size: 10px;
+    background: #00f3ff22;
+    color: #00f3ff;
+    border: 1px solid #00f3ff;
+    border-radius: 4px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 6px;
+    transition: background 0.2s;
+}
+
+.group-custom-tag:hover {
+    background: #00f3ff44;
+    box-shadow: none;
+}
+
+/* Drag handle on the left of each group header */
+.group-drag-handle {
+    color: #555;
+    font-size: 16px;
+    padding: 0 10px;
+    cursor: grab;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    user-select: none;
+}
+
+.group-drag-handle:hover {
+    color: #00f3ff;
+}
+
+/* Highlight group header when another group is dragged over it */
+.group-container.drag-over .group-header-container {
+    background-color: #222;
+    border-left-color: #ffffff;
+}
+
 /* Drag tooltip that appears on theme row hover */
 .drag-tooltip {
     position: absolute;
@@ -518,4 +567,21 @@ button:hover {
 .group-dropdown-disabled:hover {
     background: none;
     color: #555;
+}
+
+.ungrouped-header-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 28px 0 6px;
+}
+
+.ungrouped-header-row h3 {
+    margin: 0;
+}
+
+.ungrouped-custom-tag {
+    margin: 0;
+    padding: 2px 8px;
+    font-size: 9px;
 }
