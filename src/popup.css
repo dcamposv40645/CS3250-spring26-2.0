@@ -129,6 +129,46 @@ button:hover {
     text-align: center;
 }
 
+.search-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 4px;
+    padding: 0 10px;
+    margin: 10px 0;
+    transition: border-color 0.2s;
+}
+
+.search-bar:focus-within {
+    border-color: #00ff9d;
+}
+
+.search-bar input {
+    flex: 1;
+    background: none;
+    border: none;
+    color: #ccc;
+    padding: 8px 0;
+    font-size: 13px;
+    outline: none;
+    width: 100%;
+}
+
+.search-bar input::placeholder {
+    color: #444;
+}
+
+.search-bar input:focus {
+    border-color: transparent;
+    box-shadow: none;
+}
+
+.search-bar:focus-within .search-icon {
+    stroke: #00ff9d;
+}
+
 /* this section is from gemini */
 /* Container for the group - subtle accent */
 /* used Ai prompt: how can I give my groups a glow and a nice futuristic look */

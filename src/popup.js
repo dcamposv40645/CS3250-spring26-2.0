@@ -27,6 +27,7 @@ let originalThemeId = null; // Remembers what theme you had before you started h
 let lockedInTheme = null;   // Remembers what theme you actually clicked
 // eslint-disable-next-line prefer-const
 let currentSort = 'recent'; // Tracks the active sort order for themes inside groups
+let searchQuery = ''; // Tracks the current search filter
 
 /**
  * Initializes the popup by clearing the UI and re-rendering the grouped themes list.
@@ -84,6 +85,18 @@ async function initializePopup() {
             themeGroups[groupName].push(match);
         }
     });
+
+    // Filter groups and themes based on search query
+    const q = searchQuery.trim().toLowerCase();
+    if (q) {
+        for (const groupName of Object.keys(themeGroups)) {
+            const groupMatches = groupName.toLowerCase().includes(q);
+            if (!groupMatches) {
+                themeGroups[groupName] = themeGroups[groupName].filter(t => t.name.toLowerCase().includes(q));
+                if (themeGroups[groupName].length === 0) delete themeGroups[groupName];
+            }
+        }
+    }
 
     // Sort themes inside each group before rendering based on the current sort order
     for (const g in themeGroups) {
@@ -257,7 +270,10 @@ async function initializePopup() {
     otherHeader.textContent = "Ungrouped Themes";
     currentDiv.appendChild(otherHeader);
 
-    const ungroupedThemes = installedThemes.filter(theme => !savedThemes.some(s => s.id === theme.id));
+    const ungroupedThemes = installedThemes.filter(theme => {
+        if (savedThemes.some(s => s.id === theme.id)) return false;
+        return !q || theme.name.toLowerCase().includes(q);
+    });
 
     // Sort ungrouped themes using the same active sort order as the groups
     ungroupedThemes.sort((a, b) => {
@@ -436,6 +452,14 @@ if (saveBtn) {
 const shutdown = document.getElementById('shutdown');
 if (shutdown) {
     shutdown.addEventListener('click', () => window.close());
+}
+
+const searchInput = document.getElementById('search-input');
+if (searchInput) {
+    searchInput.addEventListener('input', (e) => {
+        searchQuery = e.target.value;
+        initializePopup();
+    });
 }
 
 const addGroupToggle = document.getElementById('add-group-toggle');
