@@ -57,7 +57,6 @@ async function initializePopup() {
     const groupOrderData = await browser.storage.local.get('groupOrder');
     const groupThemeOrderData = await browser.storage.local.get('groupThemeOrder');
     const ungroupedOrderData = await browser.storage.local.get('ungroupedOrder');
-
     const installedThemes = allAddons.filter(addon => addon.type === 'theme');
     const activeTheme = installedThemes.find(t => t.enabled);
     const savedThemes = storageData.userThemes || [];
@@ -766,12 +765,38 @@ function showGroupDropdown(theme, anchor, groupNames) {
     const newGroupItem = document.createElement('div');
     newGroupItem.className = 'group-dropdown-item group-dropdown-new';
     newGroupItem.textContent = '+ New group...';
-    newGroupItem.onclick = async () => {
-        dropdown.remove();
-        const newName = prompt('Group name:');
-        if (newName && newName.trim()) {
-            await moveThemeToGroup(theme.id, theme.name, newName.trim());
-        }
+    newGroupItem.onclick = (e) => {
+        // stop the click from reaching the document click-outside handler — it would
+        // see that newGroupItem is no longer inside the dropdown (we're about to clear
+        // it) and would close the dropdown before the form ever appears
+        e.stopPropagation();
+        // swap the item list for a mini creation form
+        while (dropdown.firstChild) dropdown.removeChild(dropdown.firstChild);
+
+        const form = document.createElement('div');
+        form.className = 'group-new-form';
+
+        const nameInput = document.createElement('input');
+        nameInput.type = 'text';
+        nameInput.placeholder = 'Group name...';
+        nameInput.className = 'group-new-name-input';
+
+        const createBtn = document.createElement('button');
+        createBtn.textContent = 'Create';
+        createBtn.className = 'group-new-create-btn';
+        createBtn.onclick = async (e) => {
+            e.stopPropagation(); // same reason — keep the click-outside handler from firing
+            const name = nameInput.value.trim();
+            if (!name) return;
+            dropdown.remove();
+            await moveThemeToGroup(theme.id, theme.name, name);
+        };
+
+        form.appendChild(nameInput);
+        form.appendChild(createBtn);
+        dropdown.appendChild(form);
+
+        if (nameInput.focus) nameInput.focus();
     };
     dropdown.appendChild(newGroupItem);
 

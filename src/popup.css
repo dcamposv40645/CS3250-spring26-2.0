@@ -230,9 +230,7 @@ button:hover {
     box-shadow: none;
 }
 
-.group-header-container:hover {
-    box-shadow: 0 0 8px #00ff9d, inset 0 0 8px #00ff9d22;
-}
+/* hover glow is now applied in JS so it can match the group's color */
 
 .group-content {
     background-color: #0a0a0a;
@@ -611,4 +609,53 @@ button:hover {
     margin: 0;
     padding: 2px 8px;
     font-size: 9px;
+}
+
+.group-header-container:hover {
+    box-shadow: 0 0 8px #00ff9d, inset 0 0 8px #00ff9d22;
+}
+
+/* Inline new-group form that replaces the dropdown list */
+.group-new-form {
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.group-new-name-input {
+    width: 100%;
+    background: #111;
+    border: 1px solid #333;
+    color: #ccc;
+    padding: 6px 8px;
+    font-size: 12px;
+    border-radius: 3px;
+    box-sizing: border-box;
+}
+
+.group-new-name-input:focus {
+    border-color: #00f3ff;
+    outline: none;
+    box-shadow: none;
+}
+
+.group-new-create-btn {
+    width: 100%;
+    padding: 5px;
+    font-size: 11px;
+    background: #00f3ff22;
+    color: #00f3ff;
+    border: 1px solid #00f3ff;
+    border-radius: 3px;
+    cursor: pointer;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 0;
+    transition: background 0.2s;
+}
+
+.group-new-create-btn:hover {
+    background: #00f3ff44;
+    box-shadow: none;
 }

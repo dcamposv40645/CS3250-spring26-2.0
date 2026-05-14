@@ -41,6 +41,9 @@ function makeFakeElement(tag) {
         // no-op remove so dropdown.remove() doesn't crash
         remove() {},
 
+        // no-op focus so nameInput.focus() doesn't crash
+        focus() {},
+
         // saves event listeners so we can call them in tests
         addEventListener(event, fn) {
             if (!this._listeners[event]) this._listeners[event] = [];
@@ -1499,8 +1502,24 @@ describe('initializePopup — ungrouped row events and dropdown', () => {
         expect(fakeStorage.userThemes.find(t => t.id === 'free').group).toBe('CATS');
     });
 
-    test('clicking "+ New group..." prompts for a name and saves the theme there', async () => {
-        global.prompt = jest.fn(() => 'My New Group');
+    test('"+ New group..." stops click propagation so the click-outside handler cannot close the dropdown', async () => {
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 'free', name: 'Free' })]);
+        setFakeStorage({ userThemes: [] });
+        await initializePopup();
+
+        const rows = fakeElements['popup-content'].children.filter(el => el.className === 'theme-item-row');
+        rows[0].children.find(el => el.className === 'add-to-group-btn').onclick({ stopPropagation: jest.fn() });
+
+        const dropdown = rows[0].children.find(el => el.className === 'group-dropdown');
+        const newItem = dropdown.children.find(c => c.className === 'group-dropdown-item group-dropdown-new');
+
+        const fakeEvent = { stopPropagation: jest.fn() };
+        newItem.onclick(fakeEvent);
+
+        expect(fakeEvent.stopPropagation).toHaveBeenCalled();
+    });
+
+    test('clicking "+ New group..." replaces the dropdown with an inline creation form', async () => {
         browser.management.getAll.mockResolvedValue([makeTheme({ id: 'free', name: 'Free' })]);
         setFakeStorage({ userThemes: [] });
         await initializePopup();
@@ -1512,16 +1531,42 @@ describe('initializePopup — ungrouped row events and dropdown', () => {
         const dropdown = rows[0].children.find(el => el.className === 'group-dropdown');
         const newItem = dropdown.children.find(c => c.className === 'group-dropdown-item group-dropdown-new');
 
+        newItem.onclick({ stopPropagation: jest.fn() });
+
+        // the dropdown should now contain a form instead of the original items
+        const form = dropdown.children.find(c => c.className === 'group-new-form');
+        expect(form).toBeTruthy();
+        const nameInput = form.children.find(c => c.className === 'group-new-name-input');
+        expect(nameInput).toBeTruthy();
+        const createBtn = form.children.find(c => c.className === 'group-new-create-btn');
+        expect(createBtn).toBeTruthy();
+    });
+
+    test('submitting the creation form saves the theme to the new group', async () => {
         browser.management.getAll.mockResolvedValue([makeTheme({ id: 'free', name: 'Free' })]);
-        await newItem.onclick();
+        setFakeStorage({ userThemes: [] });
+        await initializePopup();
+
+        const rows = fakeElements['popup-content'].children.filter(el => el.className === 'theme-item-row');
+        const addBtn = rows[0].children.find(el => el.className === 'add-to-group-btn');
+        addBtn.onclick({ stopPropagation: jest.fn() });
+
+        const dropdown = rows[0].children.find(el => el.className === 'group-dropdown');
+        dropdown.children.find(c => c.className === 'group-dropdown-item group-dropdown-new').onclick({ stopPropagation: jest.fn() });
+
+        const form = dropdown.children.find(c => c.className === 'group-new-form');
+        const nameInput = form.children.find(c => c.className === 'group-new-name-input');
+        nameInput._value = 'My New Group';
+
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 'free', name: 'Free' })]);
+        await form.children.find(c => c.className === 'group-new-create-btn').onclick({ stopPropagation: jest.fn() });
 
         expect(fakeStorage.userThemes).toContainEqual(
             expect.objectContaining({ id: 'free', group: 'My New Group' })
         );
     });
 
-    test('clicking "+ New group..." with blank input does nothing', async () => {
-        global.prompt = jest.fn(() => '   ');
+    test('submitting with blank name does nothing', async () => {
         browser.management.getAll.mockResolvedValue([makeTheme({ id: 'free', name: 'Free' })]);
         setFakeStorage({ userThemes: [] });
         await initializePopup();
@@ -1531,11 +1576,12 @@ describe('initializePopup — ungrouped row events and dropdown', () => {
         addBtn.onclick({ stopPropagation: jest.fn() });
 
         const dropdown = rows[0].children.find(el => el.className === 'group-dropdown');
-        const newItem = dropdown.children.find(c => c.className === 'group-dropdown-item group-dropdown-new');
+        dropdown.children.find(c => c.className === 'group-dropdown-item group-dropdown-new').onclick({ stopPropagation: jest.fn() });
 
-        await newItem.onclick();
+        const form = dropdown.children.find(c => c.className === 'group-new-form');
+        // leave nameInput._value as '' (empty)
+        await form.children.find(c => c.className === 'group-new-create-btn').onclick({ stopPropagation: jest.fn() });
 
-        // blank prompt = no save
         expect(fakeStorage.userThemes).toHaveLength(0);
     });
 
@@ -1554,3 +1600,4 @@ describe('initializePopup — ungrouped row events and dropdown', () => {
         expect(newItem.textContent).toBe('+ New group...');
     });
 });
+
