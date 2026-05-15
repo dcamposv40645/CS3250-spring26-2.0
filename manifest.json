@@ -5,7 +5,7 @@
     "description": "Keep your Firefox themes organized. Group them by mood, season, or whatever makes sense to you — then switch instantly with a single click. Preview any theme just by hovering, drag rows to reorder, sort by name or date, and search across all your groups at once. Your groups and custom order are saved automatically.",
     "author": "Team Anonymous",
     "developer": {
-        "name": "Ramin, Daniel, Julian, Alejandro, Moe"
+        "name": "Daniel Campos, Ramin Akbari, Julian Aguirre, Alejandro Casillas, Mohammed"
     },
     "icons": {
         "16": "icons/icon-16.png",
