@@ -2,7 +2,7 @@
     "manifest_version": 3,
     "name": "Anonymous Theme Switcher",
     "version": "1.0.0",
-    "description": "Organize and switch Firefox themes by group.",
+    "description": "Keep your Firefox themes organized. Group them by mood, season, or whatever makes sense to you — then switch instantly with a single click. Preview any theme just by hovering, drag rows to reorder, sort by name or date, and search across all your groups at once. Your groups and custom order are saved automatically.",
     "author": "Team Anonymous",
     "developer": {
         "name": "Ramin, Daniel, Julian, Alejandro, Moe"
@@ -21,15 +21,9 @@
         "default_popup": "src/popup.html",
         "default_title": "Anonymous Theme Switcher"
     },
-    "background": {
-        "scripts": ["src/background.js"]
-    },
     "permissions": [
         "storage",
-        "management",
-        "theme",
-        "alarms",
-        "tabs"
+        "management"
     ],
     "browser_specific_settings": {
         "gecko": {

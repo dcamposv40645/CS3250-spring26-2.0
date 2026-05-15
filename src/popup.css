@@ -31,6 +31,33 @@ h2 {
     flex: 1;
 }
 
+.bottom-bar {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 0;
+}
+
+.bottom-bar .secondary-btn {
+    margin-top: 0;
+}
+
+.bug-report-btn {
+    margin-top: 0;
+    background: transparent;
+    color: #f5a623;
+    border: 1px solid #f5a623;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    transition: background 0.2s, color 0.2s;
+}
+
+.bug-report-btn:hover {
+    background: #f5a62322;
+    color: #f5a623;
+    box-shadow: none;
+}
+
 .search-toggle-btn {
     flex-shrink: 0;
     width: auto;
@@ -541,6 +568,29 @@ button:hover {
     color: #00ff9d;
     margin-right: 7px;
     vertical-align: middle;
+}
+
+/* Persistent left-bar highlight on whichever row holds the active theme */
+.theme-item-row:has(.active-theme) {
+    border-left: 3px solid #00ff9d;
+    background-color: #00ff9d08;
+}
+
+/* Dot appended to the group header when the active theme lives inside that group */
+.group-container:has(.active-theme) .group-header::after {
+    content: ' ●';
+    color: #00ff9d;
+    font-size: 7px;
+    vertical-align: middle;
+    opacity: 0.9;
+}
+
+/* Focus ring for keyboard navigation — only appears on keyboard focus, not mouse click */
+.theme-button:focus-visible {
+    outline: 2px solid #00ff9d;
+    outline-offset: -2px;
+    background: #00ff9d0a;
+    box-shadow: none;
 }
 
 /* Highlights the whole row in green when you hover over a theme */

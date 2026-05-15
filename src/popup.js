@@ -538,8 +538,16 @@ function buildMenuItem(theme, isActive = false) {
         btn.classList.remove('dragging');
     });
 
-    // HOVER: Preview is now handled by the eye icon on the left of each row
-
+    // Arrow keys move focus between theme buttons so users can navigate without a mouse
+    btn.addEventListener('keydown', (e) => {
+        if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+        e.preventDefault();
+        const allBtns = Array.from(document.querySelectorAll('.theme-button'))
+            .filter(b => b.offsetParent !== null); // skip buttons inside collapsed groups
+        const idx = allBtns.indexOf(btn);
+        if (e.key === 'ArrowDown' && idx < allBtns.length - 1) allBtns[idx + 1].focus();
+        if (e.key === 'ArrowUp' && idx > 0) allBtns[idx - 1].focus();
+    });
 
     // CLICK: Lock it in permanently
     btn.addEventListener('click', async () => {
@@ -616,6 +624,13 @@ if (saveBtn) {
 const shutdown = document.getElementById('shutdown');
 if (shutdown) {
     shutdown.addEventListener('click', () => window.close());
+}
+
+const bugReportBtn = document.getElementById('bug-report-btn');
+if (bugReportBtn) {
+    bugReportBtn.addEventListener('click', () => {
+        browser.tabs.create({ url: 'https://docs.google.com/forms/d/e/1FAIpQLSfS1qRoKagwox1K3sQKVmmDEYEuy9-FYIjAC27u2fEsWJnK4A/viewform' });
+    });
 }
 
 const searchToggle = document.getElementById('search-toggle');
