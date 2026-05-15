@@ -210,14 +210,14 @@ button:hover {
     width: 100%;
     padding: 12px;
     background-color: #1a1a1a;
-    color: #00f3ff;
-    text-shadow: 0 0 2px rgba(0, 243, 255, 0.3);
+    color: #ffffff;
+    text-shadow: none;
     text-align: left;
     border: none;
     cursor: pointer;
     font-size: 13px;
     letter-spacing: 1.5px;
-    font-weight: bold;
+    font-weight: 800;
     text-transform: uppercase;
     margin-top: 0;
     border-radius: 0;
@@ -233,9 +233,40 @@ button:hover {
 /* hover glow is now applied in JS so it can match the group's color */
 
 .group-content {
-    background-color: #0a0a0a;
-    padding: 8px 0;
+    background-color: transparent;
+    padding: 0;
     border-top: 1px solid #222;
+}
+
+/* wrapper that sits the ↳ arrow outside the theme box */
+.group-theme-wrapper {
+    display: flex;
+    align-items: stretch;
+}
+
+.group-indent-arrow {
+    width: 26px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #444;
+    font-size: 13px;
+    background: transparent;
+    user-select: none;
+}
+
+/* override the global width:100% so the row only fills its flex share, not the arrow column */
+.group-theme-wrapper .theme-item-row {
+    flex: 1;
+    width: auto;
+}
+
+/* contained highlight so the glow doesn't bleed onto the arrow outside */
+.group-content .theme-item-row:hover {
+    box-shadow: none;
+    background-color: #00ff9d18;
+    border-left: 2px solid #00ff9d;
 }
 
 .group-content .theme-button {
@@ -267,12 +298,12 @@ button:hover {
     flex-grow: 1;
     padding: 12px;
     background: none;
-    color: #00f3ff;
+    color: #ffffff;
     text-align: left;
     border: none;
     cursor: pointer;
     font-size: 13px;
-    font-weight: bold;
+    font-weight: 800;
     text-transform: uppercase;
     letter-spacing: 1.5px;
     margin-top: 0;
@@ -379,6 +410,8 @@ button:hover {
 
 .remove-item-btn:hover {
     color: #ff0000;
+    box-shadow: none;
+    background: none;
 }
 .sort-bar {
     display: flex;
@@ -458,20 +491,6 @@ button:hover {
 }
 
 /* Drag handle on the left of each group header */
-.group-drag-handle {
-    color: #555;
-    font-size: 16px;
-    padding: 0 10px;
-    cursor: grab;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    user-select: none;
-}
-
-.group-drag-handle:hover {
-    color: #00f3ff;
-}
 
 /* Highlight group header when another group is dragged over it */
 .group-container.drag-over .group-header-container {
@@ -594,6 +613,23 @@ button:hover {
     color: #555;
 }
 
+.groups-header-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 0;
+}
+
+.groups-header-row h3 {
+    margin: 0;
+}
+
+.groups-header-row .group-custom-tag {
+    margin: 0;
+    padding: 2px 8px;
+    font-size: 9px;
+}
+
 .ungrouped-header-row {
     display: flex;
     align-items: center;
@@ -609,6 +645,26 @@ button:hover {
     margin: 0;
     padding: 2px 8px;
     font-size: 9px;
+}
+
+.ungrouped-sort-bar {
+    display: flex;
+    gap: 6px;
+    margin: 0 0 6px;
+}
+
+.ungrouped-sort-bar .sort-btn {
+    flex: 1;
+    padding: 5px 0;
+    font-size: 11px;
+}
+
+.group-header-container {
+    cursor: grab;
+}
+
+.group-header-container button {
+    cursor: pointer;
 }
 
 .group-header-container:hover {

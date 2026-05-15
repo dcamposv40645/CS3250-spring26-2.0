@@ -41,6 +41,9 @@ function makeFakeElement(tag) {
         // no-op remove so dropdown.remove() doesn't crash
         remove() {},
 
+        // returns false by default — no fake element "contains" another
+        contains() { return false; },
+
         // no-op focus so nameInput.focus() doesn't crash
         focus() {},
 
@@ -80,7 +83,7 @@ const fakeElements = {};
 
 function setupFakeElements() {
     // These are the elements popup.js looks for by ID
-    ['popup-content', 'theme-name', 'group-name', 'save-btn', 'shutdown'].forEach(id => {
+    ['popup-content', 'theme-name', 'group-name', 'save-btn', 'shutdown', 'groups-header-row'].forEach(id => {
         const el = makeFakeElement('div');
         el.id = id;
         fakeElements[id] = el;
@@ -153,6 +156,7 @@ const {
     setLockedInTheme,
     setOriginalThemeId,
     setSearchQuery,
+    setUngroupedSort,
 } = require('./popup');
 
 // ── Helper: set up fake storage data for a test ───────────────────────────────
@@ -203,6 +207,7 @@ beforeEach(() => {
     setLockedInTheme(null);
     setOriginalThemeId(null);
     setSearchQuery('');
+    setUngroupedSort('recent');
 });
 
 // =============================================================================
@@ -361,7 +366,7 @@ describe('initializePopup', () => {
 
         const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
         const contentArea = groupWrapper.children.find(el => el.className === 'group-content');
-        const row = contentArea.children.find(el => el.className === 'theme-item-row');
+        const row = contentArea.querySelectorAll('.theme-item-row')[0];
         const removeBtn = row.children.find(el => el.className === 'remove-item-btn');
 
         removeBtn.onclick();
@@ -1031,20 +1036,19 @@ describe('initializePopup — ungrouped custom order', () => {
 // =============================================================================
 describe('initializePopup — group drag and within-group reorder', () => {
 
-    test('group drag handle sets groupDrag data on dragstart', async () => {
+    test('group header container sets groupDrag data on dragstart', async () => {
         browser.management.getAll.mockResolvedValue([makeTheme({ id: 't1' })]);
         setFakeStorage({ userThemes: [{ id: 't1', group: 'cats' }] });
         await initializePopup();
 
         const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
         const headerContainer = groupWrapper.children.find(el => el.className === 'group-header-container');
-        const dragHandle = headerContainer.children.find(el => el.className === 'group-drag-handle');
 
         const dragEvent = {
             dataTransfer: { data: {}, setData(k, v) { this.data[k] = v; }, getData(k) { return this.data[k]; }, setDragImage: jest.fn() },
             stopPropagation: jest.fn(),
         };
-        dragHandle._listeners['dragstart'][0](dragEvent);
+        headerContainer._listeners['dragstart'][0](dragEvent);
         expect(dragEvent.dataTransfer.getData('groupDrag')).toBe('CATS');
         expect(dragEvent.stopPropagation).toHaveBeenCalled();
     });
@@ -1093,7 +1097,7 @@ describe('initializePopup — group drag and within-group reorder', () => {
 
         const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
         const contentArea = groupWrapper.children.find(el => el.className === 'group-content');
-        const rows = contentArea.children.filter(el => el.className === 'theme-item-row');
+        const rows = contentArea.querySelectorAll('.theme-item-row');
 
         const dropEvent = {
             preventDefault: jest.fn(),
@@ -1173,7 +1177,7 @@ describe('initializePopup — search filtering', () => {
         const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
         const contentArea = groupWrapper.children.find(el => el.className === 'group-content');
         // only the 'Alpha' theme row should appear
-        const rows = contentArea.children.filter(el => el.className === 'theme-item-row');
+        const rows = contentArea.querySelectorAll('.theme-item-row');
         expect(rows.length).toBe(1);
     });
 
@@ -1225,7 +1229,7 @@ describe('initializePopup — eye button preview', () => {
 
         const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
         const contentArea = groupWrapper.children.find(el => el.className === 'group-content');
-        const row = contentArea.children.find(el => el.className === 'theme-item-row');
+        const row = contentArea.querySelectorAll('.theme-item-row')[0];
         const eyeBtn = row.children.find(el => el.className === 'drag-handle');
 
         await eyeBtn._listeners['mouseenter'][0]();
@@ -1244,7 +1248,7 @@ describe('initializePopup — eye button preview', () => {
 
         const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
         const contentArea = groupWrapper.children.find(el => el.className === 'group-content');
-        const row = contentArea.children.find(el => el.className === 'theme-item-row');
+        const row = contentArea.querySelectorAll('.theme-item-row')[0];
         const eyeBtn = row.children.find(el => el.className === 'drag-handle');
 
         await eyeBtn._listeners['mouseenter'][0]();
@@ -1264,7 +1268,7 @@ describe('initializePopup — eye button preview', () => {
 
         const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
         const contentArea = groupWrapper.children.find(el => el.className === 'group-content');
-        const row = contentArea.children.find(el => el.className === 'theme-item-row');
+        const row = contentArea.querySelectorAll('.theme-item-row')[0];
         const eyeBtn = row.children.find(el => el.className === 'drag-handle');
 
         await eyeBtn._listeners['mouseleave'][0]();
@@ -1280,7 +1284,7 @@ describe('initializePopup — eye button preview', () => {
         // originalThemeId is null from beforeEach, leave it that way
         const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
         const contentArea = groupWrapper.children.find(el => el.className === 'group-content');
-        const row = contentArea.children.find(el => el.className === 'theme-item-row');
+        const row = contentArea.querySelectorAll('.theme-item-row')[0];
         const eyeBtn = row.children.find(el => el.className === 'drag-handle');
 
         await eyeBtn._listeners['mouseleave'][0]();
@@ -1335,7 +1339,7 @@ describe('initializePopup — grouped row drag events', () => {
 
         const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
         const contentArea = groupWrapper.children.find(el => el.className === 'group-content');
-        const row = contentArea.children.find(el => el.className === 'theme-item-row');
+        const row = contentArea.querySelectorAll('.theme-item-row')[0];
 
         const dragEvent = {
             dataTransfer: { data: {}, setData(k, v) { this.data[k] = v; }, getData(k) { return this.data[k] || ''; } }
@@ -1363,7 +1367,7 @@ describe('initializePopup — grouped row drag events', () => {
         const catsGroup = groups[0];
         const contentArea = catsGroup.children.find(el => el.className === 'group-content');
         // cats only has 'ta'
-        const row = contentArea.children.find(el => el.className === 'theme-item-row');
+        const row = contentArea.querySelectorAll('.theme-item-row')[0];
 
         const dropEvent = {
             preventDefault: jest.fn(),
@@ -1386,7 +1390,7 @@ describe('initializePopup — grouped row drag events', () => {
 
         const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
         const contentArea = groupWrapper.children.find(el => el.className === 'group-content');
-        const row = contentArea.children.find(el => el.className === 'theme-item-row');
+        const row = contentArea.querySelectorAll('.theme-item-row')[0];
 
         const dropEvent = {
             preventDefault: jest.fn(),
@@ -1598,6 +1602,443 @@ describe('initializePopup — ungrouped row events and dropdown', () => {
         const newItem = dropdown.children.find(c => c.className === 'group-dropdown-item group-dropdown-new');
         expect(newItem).toBeTruthy();
         expect(newItem.textContent).toBe('+ New group...');
+    });
+});
+
+// =============================================================================
+// TESTS FOR: initializePopup — rename group button
+// =============================================================================
+describe('initializePopup — rename button in group header', () => {
+
+    beforeEach(() => {
+        global.prompt = jest.fn();
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 't1' })]);
+    });
+
+    test('the rename button stops click propagation', async () => {
+        setFakeStorage({ userThemes: [{ id: 't1', group: 'cats' }] });
+        await initializePopup();
+
+        const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
+        const headerContainer = groupWrapper.children.find(el => el.className === 'group-header-container');
+        const renameBtn = headerContainer.children.find(el => el.className === 'rename-group-btn');
+
+        const stopPropagation = jest.fn();
+        global.prompt.mockReturnValue(null); // cancel so rename does nothing
+        renameBtn.onclick({ stopPropagation });
+
+        expect(stopPropagation).toHaveBeenCalled();
+    });
+
+    test('the rename button calls handleRenameGroup with the group name', async () => {
+        setFakeStorage({ userThemes: [{ id: 't1', group: 'cats' }] });
+        await initializePopup();
+
+        const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
+        const headerContainer = groupWrapper.children.find(el => el.className === 'group-header-container');
+        const renameBtn = headerContainer.children.find(el => el.className === 'rename-group-btn');
+
+        global.prompt.mockReturnValue('Lions');
+        renameBtn.onclick({ stopPropagation: jest.fn() });
+        await new Promise(r => setTimeout(r, 0));
+
+        expect(global.prompt).toHaveBeenCalledWith(expect.stringContaining('CATS'), 'CATS');
+    });
+});
+
+// =============================================================================
+// TESTS FOR: initializePopup — open group preserved on re-render
+// =============================================================================
+describe('initializePopup — open group preserved on re-render', () => {
+
+    test('a group that was opened stays open when the popup re-renders', async () => {
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 't1' })]);
+        setFakeStorage({ userThemes: [{ id: 't1', group: 'cats' }] });
+        await initializePopup();
+
+        const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
+        const headerContainer = groupWrapper.children.find(el => el.className === 'group-header-container');
+        const header = headerContainer.children.find(el => el.className === 'group-header');
+        header.click(); // open it
+
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 't1' })]);
+        await initializePopup();
+
+        const newGroupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
+        const newContentArea = newGroupWrapper.children.find(el => el.className === 'group-content');
+        expect(newContentArea.style.display).toBe('block');
+    });
+
+    test('a group that was closed stays closed on re-render', async () => {
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 't1' })]);
+        setFakeStorage({ userThemes: [{ id: 't1', group: 'cats' }] });
+        await initializePopup();
+
+        // Do not open the group — it starts closed
+
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 't1' })]);
+        await initializePopup();
+
+        const newGroupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
+        const newContentArea = newGroupWrapper.children.find(el => el.className === 'group-content');
+        expect(newContentArea.style.display).toBe('none');
+    });
+});
+
+// =============================================================================
+// TESTS FOR: initializePopup — groups header custom order button
+// =============================================================================
+describe('initializePopup — groups header custom order button', () => {
+
+    beforeEach(() => {
+        browser.storage.local.remove = jest.fn(async () => {});
+    });
+
+    test('shows a Custom order button next to the groups header when groupOrder is set', async () => {
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 't1' }),
+            makeTheme({ id: 't2', name: 'T2' }),
+        ]);
+        setFakeStorage({
+            userThemes: [
+                { id: 't1', group: 'cats' },
+                { id: 't2', group: 'dogs' },
+            ],
+            groupOrder: ['DOGS', 'CATS'],
+        });
+        await initializePopup();
+
+        const customTag = fakeElements['groups-header-row'].children.find(el => el.className === 'group-custom-tag');
+        expect(customTag).toBeTruthy();
+        expect(customTag.textContent).toBe('Custom order');
+    });
+
+    test('does not show a Custom order button when no groupOrder is saved', async () => {
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 't1' })]);
+        setFakeStorage({ userThemes: [{ id: 't1', group: 'cats' }] });
+        await initializePopup();
+
+        const customTag = fakeElements['groups-header-row'].children.find(el => el.className === 'group-custom-tag');
+        expect(customTag).toBeFalsy();
+    });
+
+    test('clicking the Custom order button calls remove on groupOrder', async () => {
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 't1' })]);
+        setFakeStorage({
+            userThemes: [{ id: 't1', group: 'cats' }],
+            groupOrder: ['CATS'],
+        });
+        await initializePopup();
+
+        const customTag = fakeElements['groups-header-row'].children.find(el => el.className === 'group-custom-tag');
+
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 't1' })]);
+        await customTag.onclick();
+
+        expect(browser.storage.local.remove).toHaveBeenCalledWith('groupOrder');
+    });
+});
+
+// =============================================================================
+// TESTS FOR: initializePopup — per-group custom theme order reset
+// =============================================================================
+describe('initializePopup — per-group custom order reset', () => {
+
+    test('clicking the Custom order tag inside a group deletes that group from groupThemeOrder', async () => {
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 't1' }),
+            makeTheme({ id: 't2', name: 'T2' }),
+        ]);
+        setFakeStorage({
+            userThemes: [
+                { id: 't1', group: 'cats' },
+                { id: 't2', group: 'cats' },
+            ],
+            groupThemeOrder: { CATS: ['t2', 't1'] },
+        });
+        await initializePopup();
+
+        const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
+        const contentArea = groupWrapper.children.find(el => el.className === 'group-content');
+        const customTag = contentArea.children.find(el => el.className === 'group-custom-tag');
+        expect(customTag).toBeTruthy();
+
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 't1' }),
+            makeTheme({ id: 't2', name: 'T2' }),
+        ]);
+        await customTag.onclick();
+
+        expect(fakeStorage.groupThemeOrder).not.toHaveProperty('CATS');
+    });
+
+    test('resetting per-group order preserves other groups in groupThemeOrder', async () => {
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 't1' }),
+            makeTheme({ id: 't2', name: 'T2' }),
+            makeTheme({ id: 't3', name: 'T3' }),
+        ]);
+        setFakeStorage({
+            userThemes: [
+                { id: 't1', group: 'cats' },
+                { id: 't2', group: 'cats' },
+                { id: 't3', group: 'dogs' },
+            ],
+            groupThemeOrder: { CATS: ['t2', 't1'], DOGS: ['t3'] },
+        });
+        await initializePopup();
+
+        const groups = fakeElements['popup-content'].children.filter(el => el.className === 'group-container');
+        const catsGroup = groups.find(g => {
+            const hc = g.children.find(c => c.className === 'group-header-container');
+            const h = hc && hc.children.find(c => c.className === 'group-header');
+            return h && h.textContent.includes('CATS');
+        });
+        const contentArea = catsGroup.children.find(el => el.className === 'group-content');
+        const customTag = contentArea.children.find(el => el.className === 'group-custom-tag');
+
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 't1' }),
+            makeTheme({ id: 't2', name: 'T2' }),
+            makeTheme({ id: 't3', name: 'T3' }),
+        ]);
+        await customTag.onclick();
+
+        expect(fakeStorage.groupThemeOrder).not.toHaveProperty('CATS');
+        expect(fakeStorage.groupThemeOrder).toHaveProperty('DOGS');
+    });
+});
+
+// =============================================================================
+// TESTS FOR: initializePopup — ungrouped sort buttons
+// =============================================================================
+describe('initializePopup — ungrouped sort buttons', () => {
+
+    beforeEach(() => {
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 'a', name: 'Alpha' }),
+            makeTheme({ id: 'b', name: 'Beta' }),
+            makeTheme({ id: 'c', name: 'Gamma' }),
+        ]);
+    });
+
+    test('clicking the A-Z button calls set with ungroupedOrder null', async () => {
+        setFakeStorage({ userThemes: [] });
+        await initializePopup();
+
+        const sortBar = fakeElements['popup-content'].children.find(el => el.className === 'ungrouped-sort-bar');
+        const azBtn = sortBar.children.find(btn => btn.textContent === 'A-Z');
+
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 'a', name: 'Alpha' }),
+            makeTheme({ id: 'b', name: 'Beta' }),
+            makeTheme({ id: 'c', name: 'Gamma' }),
+        ]);
+        await azBtn.onclick();
+
+        expect(browser.storage.local.set).toHaveBeenCalledWith({ ungroupedOrder: null });
+    });
+
+    test('clicking the Recent button calls set with ungroupedOrder null', async () => {
+        setFakeStorage({ userThemes: [] });
+        setUngroupedSort('az');
+        await initializePopup();
+
+        const sortBar = fakeElements['popup-content'].children.find(el => el.className === 'ungrouped-sort-bar');
+        const recentBtn = sortBar.children.find(btn => btn.textContent === 'Recent');
+
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 'a', name: 'Alpha' }),
+            makeTheme({ id: 'b', name: 'Beta' }),
+            makeTheme({ id: 'c', name: 'Gamma' }),
+        ]);
+        await recentBtn.onclick();
+
+        expect(browser.storage.local.set).toHaveBeenCalledWith({ ungroupedOrder: null });
+    });
+
+    test('clicking the Oldest button calls set with ungroupedOrder null', async () => {
+        setFakeStorage({ userThemes: [] });
+        await initializePopup();
+
+        const sortBar = fakeElements['popup-content'].children.find(el => el.className === 'ungrouped-sort-bar');
+        const oldestBtn = sortBar.children.find(btn => btn.textContent === 'Oldest');
+
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 'a', name: 'Alpha' }),
+            makeTheme({ id: 'b', name: 'Beta' }),
+            makeTheme({ id: 'c', name: 'Gamma' }),
+        ]);
+        await oldestBtn.onclick();
+
+        expect(browser.storage.local.set).toHaveBeenCalledWith({ ungroupedOrder: null });
+    });
+
+    test('A-Z sort renders ungrouped themes in alphabetical order', async () => {
+        setFakeStorage({ userThemes: [] });
+        setUngroupedSort('az');
+        await initializePopup();
+
+        const rows = fakeElements['popup-content'].children.filter(el => el.className === 'theme-item-row');
+        const names = rows.map(r => r.children.find(c => c.className.includes('theme-button')).textContent);
+        expect(names).toEqual(['Alpha', 'Beta', 'Gamma']);
+    });
+
+    test('Oldest sort renders ungrouped themes in original installation order', async () => {
+        setFakeStorage({ userThemes: [] });
+        setUngroupedSort('oldest');
+        await initializePopup();
+
+        const rows = fakeElements['popup-content'].children.filter(el => el.className === 'theme-item-row');
+        const names = rows.map(r => r.children.find(c => c.className.includes('theme-button')).textContent);
+        expect(names).toEqual(['Alpha', 'Beta', 'Gamma']);
+    });
+
+    test('Recent sort renders ungrouped themes in reverse installation order', async () => {
+        setFakeStorage({ userThemes: [] });
+        // ungroupedSort is already 'recent' from beforeEach reset
+        await initializePopup();
+
+        const rows = fakeElements['popup-content'].children.filter(el => el.className === 'theme-item-row');
+        const names = rows.map(r => r.children.find(c => c.className.includes('theme-button')).textContent);
+        expect(names).toEqual(['Gamma', 'Beta', 'Alpha']);
+    });
+});
+
+// =============================================================================
+// TESTS FOR: initializePopup — group sort bar buttons
+// =============================================================================
+describe('initializePopup — group sort bar buttons', () => {
+
+    test('clicking A-Z in the group sort bar sets that button as active on next render', async () => {
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 't1' })]);
+        setFakeStorage({ userThemes: [{ id: 't1', group: 'cats' }] });
+        await initializePopup();
+
+        const sortBar = fakeElements['popup-content'].children.find(el => el.className === 'sort-bar');
+        const azBtn = sortBar.children.find(btn => btn.textContent === 'A-Z');
+        azBtn.onclick(); // sets currentSort = 'az'
+
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 't1' })]);
+        await initializePopup();
+
+        const newSortBar = fakeElements['popup-content'].children.find(el => el.className === 'sort-bar');
+        const newAzBtn = newSortBar.children.find(btn => btn.textContent === 'A-Z');
+        expect(newAzBtn.className).toContain('sort-active');
+    });
+
+    test('A-Z group sort renders themes inside a group alphabetically', async () => {
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 't1', name: 'Zebra Theme' }),
+            makeTheme({ id: 't2', name: 'Alpha Theme' }),
+        ]);
+        setFakeStorage({
+            userThemes: [
+                { id: 't1', group: 'cats' },
+                { id: 't2', group: 'cats' },
+            ]
+        });
+        await initializePopup();
+
+        const sortBar = fakeElements['popup-content'].children.find(el => el.className === 'sort-bar');
+        const azBtn = sortBar.children.find(btn => btn.textContent === 'A-Z');
+        azBtn.onclick(); // sets currentSort = 'az'
+
+        browser.management.getAll.mockResolvedValue([
+            makeTheme({ id: 't1', name: 'Zebra Theme' }),
+            makeTheme({ id: 't2', name: 'Alpha Theme' }),
+        ]);
+        await initializePopup();
+
+        const groupWrapper = fakeElements['popup-content'].children.find(el => el.className === 'group-container');
+        const contentArea = groupWrapper.children.find(el => el.className === 'group-content');
+        const rows = contentArea.querySelectorAll('.theme-item-row');
+        const names = rows.map(r => r.children.find(c => c.className.includes('theme-button')).textContent);
+        expect(names).toEqual(['Alpha Theme', 'Zebra Theme']);
+    });
+
+    test('clicking Oldest in the group sort bar sets it as active', async () => {
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 't1' })]);
+        setFakeStorage({ userThemes: [{ id: 't1', group: 'cats' }] });
+        await initializePopup();
+
+        const sortBar = fakeElements['popup-content'].children.find(el => el.className === 'sort-bar');
+        const oldestBtn = sortBar.children.find(btn => btn.textContent === 'Oldest');
+        oldestBtn.onclick();
+
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 't1' })]);
+        await initializePopup();
+
+        const newSortBar = fakeElements['popup-content'].children.find(el => el.className === 'sort-bar');
+        const newOldestBtn = newSortBar.children.find(btn => btn.textContent === 'Oldest');
+        expect(newOldestBtn.className).toContain('sort-active');
+    });
+});
+
+// =============================================================================
+// TESTS FOR: showGroupDropdown — click-outside handler
+// =============================================================================
+describe('showGroupDropdown — click-outside closes the dropdown', () => {
+
+    test('clicking outside the dropdown removes it and unregisters the handler', async () => {
+        jest.useFakeTimers();
+
+        let capturedHandler = null;
+        document.addEventListener.mockImplementation((event, fn) => {
+            if (event === 'click') capturedHandler = fn;
+        });
+        jest.spyOn(document, 'removeEventListener').mockImplementation(() => {});
+
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 'free', name: 'Free' })]);
+        setFakeStorage({ userThemes: [] });
+        await initializePopup();
+
+        const rows = fakeElements['popup-content'].children.filter(el => el.className === 'theme-item-row');
+        const addBtn = rows[0].children.find(el => el.className === 'add-to-group-btn');
+        addBtn.onclick({ stopPropagation: jest.fn() });
+
+        jest.runAllTimers(); // fires the setTimeout, which calls document.addEventListener('click', handler)
+
+        expect(capturedHandler).not.toBeNull();
+
+        // Simulate a click on something outside the dropdown
+        const outsideEl = makeFakeElement('div');
+        capturedHandler({ target: outsideEl });
+
+        expect(document.removeEventListener).toHaveBeenCalledWith('click', capturedHandler);
+
+        jest.useRealTimers();
+        document.removeEventListener.mockRestore();
+    });
+
+    test('clicking inside the dropdown does not remove it', async () => {
+        jest.useFakeTimers();
+
+        let capturedHandler = null;
+        document.addEventListener.mockImplementation((event, fn) => {
+            if (event === 'click') capturedHandler = fn;
+        });
+        jest.spyOn(document, 'removeEventListener').mockImplementation(() => {});
+
+        browser.management.getAll.mockResolvedValue([makeTheme({ id: 'free', name: 'Free' })]);
+        setFakeStorage({ userThemes: [] });
+        await initializePopup();
+
+        const rows = fakeElements['popup-content'].children.filter(el => el.className === 'theme-item-row');
+        const addBtn = rows[0].children.find(el => el.className === 'add-to-group-btn');
+        addBtn.onclick({ stopPropagation: jest.fn() });
+
+        jest.runAllTimers();
+
+        const dropdown = rows[0].children.find(el => el.className === 'group-dropdown');
+        dropdown.contains = () => true; // simulate click inside the dropdown
+
+        capturedHandler({ target: makeFakeElement('div') });
+
+        expect(document.removeEventListener).not.toHaveBeenCalled();
+
+        jest.useRealTimers();
+        document.removeEventListener.mockRestore();
     });
 });
 

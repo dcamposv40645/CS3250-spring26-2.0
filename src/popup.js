@@ -27,6 +27,7 @@ let originalThemeId = null; // Remembers what theme you had before you started h
 let lockedInTheme = null;   // Remembers what theme you actually clicked
 // eslint-disable-next-line prefer-const
 let currentSort = 'recent'; // Tracks the active sort order for themes inside groups
+let ungroupedSort = 'recent'; // Tracks the active sort order for ungrouped themes
 let searchQuery = ''; // Tracks the current search filter
 
 /**
@@ -142,6 +143,21 @@ async function initializePopup() {
         currentDiv.appendChild(emptyMsg);
     }
 
+    // Show "Custom order" tag next to the groups header when groups are in custom drag order
+    const groupsHeaderRow = document.getElementById('groups-header-row');
+    groupsHeaderRow.querySelectorAll('.group-custom-tag').forEach(el => el.remove());
+    if (savedGroupOrder) {
+        const customBtn = document.createElement('button');
+        customBtn.textContent = 'Custom order';
+        customBtn.className = 'group-custom-tag';
+        customBtn.title = 'Groups are in custom order — click to reset';
+        customBtn.onclick = async () => {
+            await browser.storage.local.remove('groupOrder');
+            initializePopup();
+        };
+        groupsHeaderRow.appendChild(customBtn);
+    }
+
     // Build the sort bar so the user can switch between Recent, Oldest, and A-Z
     const sortBar = document.createElement('div');
     sortBar.className = 'sort-bar';
@@ -154,18 +170,6 @@ async function initializePopup() {
         btn.onclick = () => { currentSort = key; initializePopup(); };
         sortBar.appendChild(btn);
     });
-
-    if (savedGroupOrder) {
-        const customBtn = document.createElement('button');
-        customBtn.textContent = 'Custom';
-        customBtn.className = 'sort-btn sort-active';
-        customBtn.title = 'Groups are in custom order — click to reset';
-        customBtn.onclick = async () => {
-            await browser.storage.local.remove('groupOrder');
-            initializePopup();
-        };
-        sortBar.appendChild(customBtn);
-    }
 
     currentDiv.appendChild(sortBar);
 
@@ -234,7 +238,7 @@ async function initializePopup() {
 
         const contentArea = document.createElement('div');
         contentArea.className = 'group-content';
-        contentArea.style.display = openGroups.has(Object.keys(themeGroups).indexOf(groupName)) ? "block" : "none";
+        contentArea.style.display = (q || openGroups.has(Object.keys(themeGroups).indexOf(groupName))) ? "block" : "none";
 
         if (groupThemeOrder[groupName]) {
             const customTag = document.createElement('button');
@@ -324,7 +328,14 @@ async function initializePopup() {
                 }
             });
 
-            contentArea.appendChild(row);
+            const rowWrapper = document.createElement('div');
+            rowWrapper.className = 'group-theme-wrapper';
+            const arrow = document.createElement('span');
+            arrow.className = 'group-indent-arrow';
+            arrow.textContent = '↳';
+            rowWrapper.appendChild(arrow);
+            rowWrapper.appendChild(row);
+            contentArea.appendChild(rowWrapper);
         });
 
         // Click to Toggle Logic
@@ -338,18 +349,14 @@ async function initializePopup() {
             }
         });
 
-        const groupDragHandle = document.createElement('span');
-        groupDragHandle.className = 'group-drag-handle';
-        groupDragHandle.innerHTML = '⠿';
-        groupDragHandle.title = 'Drag to reorder group';
-        groupDragHandle.draggable = true;
-        groupDragHandle.addEventListener('dragstart', (e) => {
+        headerContainer.draggable = true;
+        headerContainer.style.cursor = 'grab';
+        headerContainer.addEventListener('dragstart', (e) => {
             e.dataTransfer.setData('groupDrag', groupName);
             e.dataTransfer.setDragImage(groupWrapper, 15, 15);
             e.stopPropagation();
         });
 
-        headerContainer.appendChild(groupDragHandle);
         headerContainer.appendChild(header);
         headerContainer.appendChild(renameBtn);
         headerContainer.appendChild(delGroupBtn);
@@ -370,7 +377,7 @@ async function initializePopup() {
         return !q || theme.name.toLowerCase().includes(q);
     });
 
-    // Sort ungrouped themes — use custom order if set, otherwise global sort
+    // Sort ungrouped themes — use custom drag order if set, otherwise use ungroupedSort
     if (ungroupedOrder) {
         ungroupedThemes.sort((a, b) => {
             const ai = ungroupedOrder.indexOf(a.id);
@@ -381,11 +388,28 @@ async function initializePopup() {
         });
     } else {
         ungroupedThemes.sort((a, b) => {
-            if (currentSort === 'az') return a.name.localeCompare(b.name);
-            if (currentSort === 'oldest') return installedThemes.indexOf(a) - installedThemes.indexOf(b);
+            if (ungroupedSort === 'az') return a.name.localeCompare(b.name);
+            if (ungroupedSort === 'oldest') return installedThemes.indexOf(a) - installedThemes.indexOf(b);
             return installedThemes.indexOf(b) - installedThemes.indexOf(a);
         });
     }
+
+    // sort buttons for ungrouped section
+    const ungroupedSortBar = document.createElement('div');
+    ungroupedSortBar.className = 'ungrouped-sort-bar';
+
+    ['A-Z', 'Recent', 'Oldest'].forEach(label => {
+        const key = label === 'A-Z' ? 'az' : label.toLowerCase();
+        const btn = document.createElement('button');
+        btn.textContent = label;
+        btn.className = 'sort-btn' + (ungroupedSort === key && !ungroupedOrder ? ' sort-active' : '');
+        btn.onclick = async () => {
+            ungroupedSort = key;
+            await browser.storage.local.set({ ungroupedOrder: null });
+            initializePopup();
+        };
+        ungroupedSortBar.appendChild(btn);
+    });
 
     if (ungroupedOrder) {
         const ungroupedCustomTag = document.createElement('button');
@@ -400,6 +424,7 @@ async function initializePopup() {
     }
 
     currentDiv.appendChild(ungroupedHeaderRow);
+    currentDiv.appendChild(ungroupedSortBar);
 
     ungroupedThemes.forEach(theme => {
         const row = document.createElement('div');
@@ -906,6 +931,7 @@ if (typeof module !== 'undefined' && module.exports) {
         setOriginalThemeId: (v) => { originalThemeId = v; },
         setLockedInTheme: (v) => { lockedInTheme = v; },
         setSearchQuery: (v) => { searchQuery = v; },
+        setUngroupedSort: (v) => { ungroupedSort = v; },
     };
 }
 /* eslint-enable no-undef */
